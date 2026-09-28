@@ -1,0 +1,6 @@
+﻿<Solution>
+  <Project Path="Auth.API/Auth.API.csproj" />
+  <Project Path="core/Auth.Application/Auth.Application.csproj" />
+  <Project Path="core/Auth.Domain/Auth.Domain.csproj" />
+  <Project Path="external/Auth.Infrastructure/Auth.Infrastructure.csproj" />
+</Solution>
