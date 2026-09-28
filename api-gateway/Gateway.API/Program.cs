@@ -1,23 +1,23 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using System.Threading.RateLimiting;
 using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Sub claim'ini bozmaması için
-JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
-
-// x. JWT ayarlarını oku
+// JWT
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["Key"];
+if (string.IsNullOrWhiteSpace(secretKey))
+    throw new InvalidOperationException(
+        "JwtSettings:Key tanımlı değil (appsettings.Development.json ya da JwtSettings__Key env).");
 
-// y. Authentication servisini ekliyoruz
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false; // "sub" claim'i olduğu gibi kalsın
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -30,70 +30,87 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// z. Authorization ekledim
+//builder.Services.AddAuthorization(options =>
+//{
+//    options.AddPolicy("default", policy => policy.RequireAuthenticatedUser());
+//});
+
 builder.Services.AddAuthorization();
 
-// a. CORS AYARLARI (React UI'dan gelen isteklere izin veriyoruz)
+// CORS (origin'ler appsettings'ten)
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                     ?? new[] { "http://localhost:3011" };
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReactUI", policy =>
-    {
-        // UI'ın adresi
-        policy.WithOrigins("https://localhost:3011", "http://localhost:3011")
+    options.AddPolicy("AllowReactUI", policy => policy
+        .WithOrigins(allowedOrigins)
         .AllowAnyHeader()
-        .AllowAnyMethod();
-    });
+        .AllowAnyMethod());
 });
 
-// b. YARP AYARLARI (Reverse Proxy'yi ve appsettings'teki kuralları yüklüyoruz) ve X-User-Id Transformunu yazıyoruz
+// Rate limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Auth route'ları: brute-force koruması, IP başına
+    options.AddPolicy("auth-limit", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Diğer route'lar: kullanıcı başına (sub), yoksa IP
+    options.AddPolicy("api-limit", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirst("sub")?.Value
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+
+// YARP + X-User-Id transform
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
     .AddTransforms(builderContext =>
     {
         builderContext.AddRequestTransform(transformContext =>
         {
-            // eğer istek yapan kullanıcı giriş yapmışsa (token doğrulanmışsa)
+            // Client'ın kendi gönderdiği X-User-Id'yi asla iletme (spoofing)
+            transformContext.ProxyRequest.Headers.Remove("X-User-Id");
+
             if (transformContext.HttpContext.User.Identity?.IsAuthenticated == true)
             {
-                var userId = transformContext.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+                var userId = transformContext.HttpContext.User
+                    .FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
 
                 if (!string.IsNullOrEmpty(userId))
-                {
-                    // Arkadaki mikroservise X-User-Id header'ı olarak ekle
                     transformContext.ProxyRequest.Headers.Add("X-User-Id", userId);
-                }
             }
             return ValueTask.CompletedTask;
         });
     });
 
-// Add services to the container.
-
-builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
 app.UseRouting();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-app.UseHttpsRedirection();
-
 app.UseCors("AllowReactUI");
-
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter(); // routing + auth'tan sonra: route politikası ve sub okunabilir
 
-
-// c. YARP'ın trafik yönlendirme mekanizmasını çalıştırıyoruz.
+app.MapHealthChecks("/health");
 app.MapReverseProxy();
-
-app.MapControllers();
 
 app.Run();
