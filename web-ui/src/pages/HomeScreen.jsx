@@ -1,17 +1,24 @@
 import { useState, useEffect } from 'react';
-import { interviewService } from '../services/interviewService';
+import { matchService } from '../services/matchService';
+import { interviewService } from '../services/interviewService'; 
 
 export default function HomeScreen({ onStartInterview }) {
+  // Input State'leri
+  const [cvFile, setCvFile] = useState(null);
   const [cvName, setCvName] = useState('Dosya Seç veya Sürükle');
+  const [jobText, setJobText] = useState('');
+  
+  // UI State'leri
   const [cvStyle, setCvStyle] = useState({});
   const [status, setStatus] = useState('idle'); // 'idle', 'analyzing', 'done'
   const [progress, setProgress] = useState(0);
+  const [analysisResult, setAnalysisResult] = useState(null);
   
   // Geçmiş Mülakatlar için State'ler
   const [pastInterviews, setPastInterviews] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
-  // Sayfa yüklendiğinde geçmiş mülakatları çek
+  // Sayfa yüklendiğinde geçmiş analizleri servisinden çek
   useEffect(() => {
     const fetchHistory = async () => {
       try {
@@ -28,31 +35,56 @@ export default function HomeScreen({ onStartInterview }) {
     fetchHistory();
   }, []);
 
-  const handleCvSelect = () => {
-    setCvName('baha_cv_2026.pdf');
-    setCvStyle({ borderColor: 'var(--success)', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)' });
+  // Dosya seçme işlemi (Gerçek input ile)
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setCvFile(file);
+      setCvName(file.name);
+      setCvStyle({ borderColor: 'var(--success)', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)' });
+    }
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
+    if (!cvFile && cvName === 'Dosya Seç veya Sürükle') {
+      alert("Lütfen önce bir CV dosyası yükleyin.");
+      return;
+    }
+    if (!jobText.trim()) {
+      alert("Lütfen bir ilan metni girin.");
+      return;
+    }
+
     setStatus('analyzing');
     setProgress(0);
     
+    // API beklerken görsel bir animasyon başlat 
     let current = 0;
     const interval = setInterval(() => {
       current += 2;
-      setProgress(current);
-      if (current >= 82) {
-        clearInterval(interval);
-        setStatus('done');
-        setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
-      }
+      if (current <= 75) setProgress(current);
     }, 40);
+
+    try {
+      // Mock API'ye (İleride gerçek backend'e) istek atıyoruz
+      const res = await matchService.analyzeMatch(cvFile || 'mock.pdf', jobText);
+      
+      clearInterval(interval);
+      setProgress(res.score); // Backend'den dönen GERÇEK skoru bas
+      setAnalysisResult(res.analysis); // Backend'den dönen analizleri state'e at
+      setStatus('done');
+      
+      setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
+    } catch (error) {
+      clearInterval(interval);
+      setStatus('idle');
+      alert("Analiz sırasında bir hata oluştu.");
+    }
   };
 
   return (
     <div className="view active" style={{ justifyContent: 'flex-start', minHeight: '75vh' }}>
       
-      {/* Web Uygulaması Bilgilendirme Alanı */}
       <div className="home-info-section">
         <h3 className="info-title">CV'ni yükle, ilana göre güçlendir, mülakatı burada prova et.</h3>
         <p className="info-desc">Mülakat Hazırlık, başvurduğun ilana özel CV düzeltme önerileri çıkarır, ardından aynı ilana göre üretilmiş sorularla seni mülakata hazırlar — hepsi tek yerde.</p>
@@ -71,12 +103,16 @@ export default function HomeScreen({ onStartInterview }) {
               Özgeçmiş Belgesi
             </div>
           </div>
-          <div className="cv-dropzone" onClick={handleCvSelect} style={cvStyle}>
+          
+          <input type="file" id="cv-upload" style={{ display: 'none' }} onChange={handleFileChange} accept=".pdf,.doc,.docx" />
+          
+          <div className="cv-dropzone" onClick={() => document.getElementById('cv-upload').click()} style={cvStyle}>
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <p style={{ color: cvStyle.color || 'inherit' }}>{cvName}</p>
-            <span>{status === 'idle' && cvName !== 'baha_cv_2026.pdf' ? 'PDF veya DOCX (Maks 5MB)' : 'Başarıyla Yüklendi ✓'}</span>
+            <span>{status === 'idle' && cvName === 'Dosya Seç veya Sürükle' ? 'PDF veya DOCX (Maks 5MB)' : 'Başarıyla Yüklendi ✓'}</span>
           </div>
         </div>
+
         <div className="square-card">
           <div className="card-header">
             <div className="card-header-title">
@@ -84,7 +120,12 @@ export default function HomeScreen({ onStartInterview }) {
               Hedef İş İlanı
             </div>
           </div>
-          <textarea className="job-textarea" placeholder="İlanın aranan nitelikler ve iş tanımı kısımlarını buraya yapıştırın..."></textarea>
+          <textarea 
+            className="job-textarea" 
+            placeholder="İlanın aranan nitelikler ve iş tanımı kısımlarını buraya yapıştırın..."
+            value={jobText}
+            onChange={(e) => setJobText(e.target.value)}
+          ></textarea>
         </div>
       </div>
       
@@ -111,20 +152,34 @@ export default function HomeScreen({ onStartInterview }) {
             </p>
           </div>
 
-          {status === 'done' && (
+          {status === 'done' && analysisResult && (
             <div style={{ animation: 'fadeIn 0.6s ease' }}>
+              
+              <p style={{ textAlign: 'center', marginBottom: '20px', fontSize: '1.1rem' }}>
+                {analysisResult.recommendation}
+              </p>
+
               <div className="plus-minus-grid">
                 <div className="pm-card">
                   <div className="pm-header plus">Güçlü Eşleşmeler</div>
                   <ul className="pm-list">
-                    <li><div className="pm-icon plus">+</div><div><b>Programlama Dilleri:</b> Python ve C# tecrübeniz ilanla birebir örtüşüyor.</div></li>
-                    <li><div className="pm-icon plus">+</div><div><b>Veritabanı Yönetimi:</b> PostgreSQL bilginiz beklentileri karşılıyor.</div></li>
+                    {analysisResult.matched_skills.map((skill, index) => (
+                      <li key={`matched-${index}`}>
+                        <div className="pm-icon plus">+</div>
+                        <div><b>{skill}</b> yetkinliği ilanla örtüşüyor.</div>
+                      </li>
+                    ))}
                   </ul>
                 </div>
                 <div className="pm-card">
                   <div className="pm-header minus">Geliştirilmesi Gerekenler</div>
                   <ul className="pm-list">
-                    <li><div className="pm-icon minus">-</div><div><b>Bulut Teknolojileri:</b> CV'nizde AWS tecrübesi eksik. Mülakata hazırlıklı olun.</div></li>
+                    {analysisResult.missing_skills.map((skill, index) => (
+                      <li key={`missing-${index}`}>
+                        <div className="pm-icon minus">-</div>
+                        <div><b>{skill}</b> eksik. Mülakata hazırlıklı olun.</div>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -138,15 +193,14 @@ export default function HomeScreen({ onStartInterview }) {
         </div>
       )}
 
-      {/* Geçmiş Mülakatlar - Artık Dinamik */}
-      <div className="history-section" style={{ display: 'block', width: '100%', marginTop: '20px' }}>
+      <div className="history-section" id="past-interviews" style={{ display: 'block', width: '100%', marginTop: '40px' }}>
         <div className="history-header">Önceki Mülakat Kayıtları</div>
         <div className="history-list">
           {loadingHistory ? (
             <p style={{ color: 'var(--text-muted)', padding: '20px 0' }}>Kayıtlar yükleniyor...</p>
           ) : pastInterviews.length > 0 ? (
-            pastInterviews.map((item, index) => (
-              <div className="history-item" key={item.session_id || index}>
+            pastInterviews.map((item) => (
+              <div className="history-item" key={item.session_id}>
                 <div className="history-info">
                   <h4>{item.title}</h4>
                   <p>{item.date}</p>

@@ -36,13 +36,15 @@ export default function InterviewScreen({ onFinish, onCancel }) {
     let timer;
     if (phase === 'active' && timeLeft > 0 && !loading) {
       timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-    } else if (timeLeft === 0 && phase === 'active') {
-      alert("Bu soru için süreniz doldu! İleri butonuna basarak devam edin.");
+    } else if (timeLeft === 0 && phase === 'active' && !loading) {
+      // Süre bittiğinde otomatik pas geçmek veya uyarmak yerine sadece uyarı veriyoruz
+      alert("Süreniz doldu! Lütfen cevabınızı tamamlayıp İleri butonuna basınız.");
     }
     return () => clearInterval(timer);
   }, [phase, timeLeft, loading]);
 
   const formatTime = (secs) => {
+    if (secs < 0) secs = 0;
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `0${m}:${s < 10 ? '0' : ''}${s}`;
@@ -50,10 +52,9 @@ export default function InterviewScreen({ onFinish, onCancel }) {
 
   // 2. Mülakatı Başlatma Akışı
   const handleStart = async () => {
-    if (!sessionId) return alert("Oturum henüz hazır değil, lütfen bekleyin.");
+    if (!sessionId) return alert("Oturum henüz hazır değil, lütfen 1-2 saniye bekleyin.");
     setLoading(true);
     try {
-      // Sözleşme: start -> current-question -> start-timer
       await interviewService.startInterview(sessionId);
       const qRes = await interviewService.getCurrentQuestion(sessionId);
       
@@ -72,10 +73,11 @@ export default function InterviewScreen({ onFinish, onCancel }) {
 
   // 3. İleri (Cevapla) veya Bitir Akışı
   const handleNext = async () => {
+    if (!answer.trim()) return alert("Lütfen cevabınızı boş bırakmayınız. Boş bırakmak istiyorsanız Pas Geç butonunu kullanınız.");
+    
     setLoading(true);
     try {
       if (currentQ < totalQ) {
-        // Sözleşme: answer -> yeni soruyu ekrana bas -> start-timer
         const res = await interviewService.submitAnswer(sessionId, questionId, { answer });
         
         setQuestionId(res.next_question.question_id);
@@ -86,7 +88,6 @@ export default function InterviewScreen({ onFinish, onCancel }) {
         
         await interviewService.startQuestionTimer(sessionId, res.next_question.question_id);
       } else {
-        // Sözleşme: complete -> rapor datasıyla onFinish'i çağır
         const res = await interviewService.completeInterview(sessionId);
         onFinish(res.report); 
       }
@@ -102,7 +103,6 @@ export default function InterviewScreen({ onFinish, onCancel }) {
     setLoading(true);
     try {
       if (currentQ < totalQ) {
-        // Sözleşme: skip -> yeni soruyu ekrana bas -> start-timer
         const res = await interviewService.skipQuestion(sessionId, questionId);
         
         setQuestionId(res.next_question.question_id);
@@ -135,9 +135,10 @@ export default function InterviewScreen({ onFinish, onCancel }) {
     <>
       {phase === 'intro' ? (
         <div className="view active" style={{ alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
-          <div className="back-link" onClick={handleAbandon}>
-            <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Analiz Ekranına Dön
+          <div className="back-link" onClick={handleAbandon} style={{ alignSelf: 'flex-start', cursor: 'pointer', marginBottom: '20px' }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Analiz Ekranına Dön
           </div>
+          
           <div className="intro-card">
             <h2>Mülakat Simülasyonu</h2>
             <p>Aday profiline ve iş ilanındaki eksiklerine göre özel olarak oluşturulmuş yapay zeka mülakatına başlamak üzeresin.</p>
@@ -151,9 +152,9 @@ export default function InterviewScreen({ onFinish, onCancel }) {
           </div>
         </div>
       ) : (
-        <div className="view active" style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div className="back-link" onClick={handleAbandon}>
-            <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Mülakattan Çık
+        <div className="view active" style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+          <div className="back-link" onClick={handleAbandon} style={{ cursor: 'pointer', marginBottom: '20px' }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Mülakattan Çık
           </div>
           
           <div className="int-header">
@@ -162,8 +163,8 @@ export default function InterviewScreen({ onFinish, onCancel }) {
               <h3>0{currentQ} / 0{totalQ}</h3>
             </div>
             <div className="timer-box">
-              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span className="timer-time" style={{ color: timeLeft <= 30 ? 'var(--danger)' : 'inherit' }}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span className="timer-time" style={{ color: timeLeft <= 30 ? 'var(--danger)' : 'inherit', marginLeft: '8px', fontWeight: 'bold' }}>
                 {formatTime(timeLeft)}
               </span>
             </div>
@@ -179,13 +180,19 @@ export default function InterviewScreen({ onFinish, onCancel }) {
             disabled={loading}
           ></textarea>
 
-          <div className="int-nav-btns" style={{ justifyContent: 'space-between' }}>
-            <button className="btn btn-outline" style={{ borderColor: '#4B5563' }} onClick={handleSkip} disabled={loading}>
+          <div className="int-nav-btns" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
+            <button className="btn btn-outline" style={{ borderColor: '#4B5563', padding: '12px 24px' }} onClick={handleSkip} disabled={loading}>
               {loading ? 'İşleniyor...' : 'Pas Geç'}
             </button>
-            <button className="btn" style={{ background: currentQ === totalQ ? 'var(--success)' : 'var(--primary)' }} onClick={handleNext} disabled={loading}>
+            
+            <button 
+              className="btn" 
+              style={{ background: currentQ === totalQ ? 'var(--success)' : 'var(--primary)', padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px' }} 
+              onClick={handleNext} 
+              disabled={loading}
+            >
               {loading ? 'Gönderiliyor...' : (currentQ === totalQ ? 'Mülakatı Bitir' : 'İleri')}
-              {!loading && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>}
+              {!loading && currentQ !== totalQ && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>}
             </button>
           </div>
         </div>

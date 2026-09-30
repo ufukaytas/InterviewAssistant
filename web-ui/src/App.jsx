@@ -6,17 +6,33 @@ import InterviewScreen from './pages/InterviewScreen'
 import ReportScreen from './pages/ReportScreen'
 
 function App() {
-  // Uygulamanın hangi ekranda olduğunu tutan state
-  // Olası değerler: 'auth', 'home', 'interview', 'report'
   const [currentView, setCurrentView] = useState('auth');
-  
-  // Kullanıcının giriş yapıp yapmadığını tutan state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Mülakat sonucunu (raporu) tutacağımız state
+  const [interviewReport, setInterviewReport] = useState(null);
 
+  // Mülakat bittiğinde çalışacak fonksiyon (Veriyi yakalar)
+  const handleInterviewFinish = (reportData) => {
+    setInterviewReport(reportData); // Gelen raporu kaydet
+    setCurrentView('report');       // Rapor ekranına geç
+  };
+  
   // Çıkış yapma fonksiyonu
   const handleLogout = () => {
     setIsAuthenticated(false);
     setCurrentView('auth');
+  };
+  const handleGoToHistory = () => {
+    if (!isAuthenticated) return;
+    
+    // Önce Ana Sayfaya (home) geçiş yap
+    setCurrentView('home');
+    
+    // DOM'un (ekranın) render olması için çok kısa bir süre bekleyip aşağı kaydır
+    setTimeout(() => {
+      document.getElementById('past-interviews')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   // Hangi ekranın render edileceğini belirleyen fonksiyon
@@ -32,12 +48,20 @@ function App() {
       case 'home':
         return <HomeScreen onStartInterview={() => setCurrentView('interview')} />;
       case 'interview':
+        // DÜZELTME 1: onFinish olayını handleInterviewFinish fonksiyonuna bağladık
         return <InterviewScreen 
-                 onFinish={() => setCurrentView('report')} 
+                 onFinish={handleInterviewFinish} 
                  onCancel={() => setCurrentView('home')} 
                />;
       case 'report':
-        return <ReportScreen onReturnHome={() => setCurrentView('home')} />;
+        // DÜZELTME 2: reportData prop'unu ekledik
+        return <ReportScreen 
+                 reportData={interviewReport} 
+                 onReturnHome={() => {
+                   setInterviewReport(null); // Temizleyip eve dön
+                   setCurrentView('home');
+                 }} 
+               />;
       default:
         return <AuthScreen onLogin={() => setCurrentView('home')} />;
     }
@@ -45,7 +69,12 @@ function App() {
 
   return (
     <>
-      <Header isAuthenticated={isAuthenticated} onLogout={handleLogout} onLogoClick={() => isAuthenticated && setCurrentView('home')} />
+      <Header 
+        isAuthenticated={isAuthenticated} 
+        onLogout={handleLogout} 
+        onLogoClick={() => isAuthenticated && setCurrentView('home')} 
+        onHistoryClick={handleGoToHistory} 
+      />
       <main>
         {renderView()}
       </main>
