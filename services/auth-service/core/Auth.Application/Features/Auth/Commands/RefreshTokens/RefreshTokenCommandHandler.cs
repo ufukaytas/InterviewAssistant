@@ -27,7 +27,13 @@ namespace Auth.Application.Features.Auth.Commands.RefreshTokens
             var existingToken = await _refreshTokenRepository.GetRefreshTokenAsync(request.RefreshToken);
             if (existingToken == null)
                 throw new BusinessException("RefreshToken bulunamadı");
-            
+
+            if (existingToken.IsExpired)
+                throw new BusinessException("RefreshToken süresi doldu");
+
+            if (!existingToken.IsActiveToken)
+                throw new BusinessException("RefreshToken aktif değil");
+
             existingToken.RevokedDate = DateTime.UtcNow;
             existingToken.IsActive = false;
 
