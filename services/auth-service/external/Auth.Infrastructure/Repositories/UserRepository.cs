@@ -2,6 +2,7 @@
 using Auth.Domain.Entities;
 using Auth.Infrastructure.Contexts;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -39,6 +40,12 @@ namespace Auth.Infrastructure.Repositories
             return await _context.Users
                 .Include(x => x.UserRoles)
                 .FirstOrDefaultAsync(x => x.Id == userId);
+        }
+
+        public bool Update(User user)
+        {
+            EntityEntry<User> entityEntry = _context.Users.Update(user);
+            return entityEntry.State == EntityState.Modified;
         }
     }
 }

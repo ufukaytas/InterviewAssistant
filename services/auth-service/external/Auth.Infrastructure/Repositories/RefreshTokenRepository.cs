@@ -30,6 +30,12 @@ namespace Auth.Infrastructure.Repositories
                 .FirstOrDefaultAsync(x => x.Token == token);
         }
 
+        public bool Remove(RefreshToken refreshToken)
+        {
+            EntityEntry<RefreshToken> entityEntry = _context.RefreshTokens.Remove(refreshToken);
+            return entityEntry.State == EntityState.Deleted;
+        }
+
         public bool Update(RefreshToken refreshToken)
         {
             EntityEntry<RefreshToken> entityEntry = _context.RefreshTokens.Update(refreshToken);

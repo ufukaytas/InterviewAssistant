@@ -11,7 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Features\Auth\Commands\Logout\" />
     <Folder Include="Features\Auth\Queries\" />
     <Folder Include="Features\Users\" />
   </ItemGroup>

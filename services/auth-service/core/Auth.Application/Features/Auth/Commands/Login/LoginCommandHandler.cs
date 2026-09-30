@@ -31,7 +31,7 @@ namespace Auth.Application.Features.Auth.Commands.Login
             var user = await _userRepository.GetUserByEmailAsync(request.Email);
 
             if (user == null || !_hasher.Verify(request.Password, user.PasswordHash))
-                throw new BusinessException("Email veya şifre hatalı");
+                throw new AuthenticationException("Email veya şifre hatalı");
 
             if (!user.IsActive)
                 throw new BusinessException("Hesabınız devre dışı");

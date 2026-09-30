@@ -10,6 +10,8 @@ namespace Auth.Domain.Entities
         public string LastName { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string PasswordHash { get; set; } = null!;
+        public string? ResetToken { get; set; }
+        public DateTime? PasswordResetTokenExpiry { get; set; }
 
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();

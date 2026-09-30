@@ -10,5 +10,7 @@ namespace Auth.Application.Interfaces
         Task<RefreshToken?> GetRefreshTokenAsync(string token);
         Task AddAsync(RefreshToken refreshToken);
         bool Update(RefreshToken refreshToken);
+        bool Remove(RefreshToken refreshToken);
+
     }
 }
