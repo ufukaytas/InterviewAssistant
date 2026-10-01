@@ -66,7 +66,7 @@ async def analyze_match(
     job_text: str = Form(..., description="İş ilanı metni"),
     user=Depends(get_current_user)
 ):
-    user_id = user.get("sub", "default_user")
+    user_id = str(user.get("sub") or user.get("user_id") or "default_user")
 
     # PDF kontrolü ve metin çıkarma
     if not cv_file.filename.lower().endswith(".pdf"):
@@ -116,7 +116,6 @@ async def analyze_match(
     strong_matches = analysis_info.get("strong_matches", [])
     improvements = analysis_info.get("improvements", [])
     
-    # Adayın CV'sindeki tüm becerileri al, yoksa eşleşenleri koru
     cv_skills = analysis_info.get("cv_skills", matching_skills)
 
     # 1. İlanı MongoDB'ye kaydet
@@ -143,7 +142,7 @@ async def analyze_match(
     }
     cv_result = await cv_collection.insert_one(cv_doc)
 
-    # 3. Analiz sonucunu (Mockup arayüz kartları dahil) MongoDB'ye kaydet
+    # 3. Analiz sonucunu MongoDB'ye kaydet
     match_doc = {
         "user_id": user_id,
         "job_posting_id": job_id,
@@ -173,7 +172,7 @@ async def analyze_match(
 
 @app.get("/api/v1/matches/history", tags=["Matching"])
 async def get_match_history(user=Depends(get_current_user)):
-    user_id = user.get("sub", "default_user")
+    user_id = str(user.get("sub") or user.get("user_id") or "default_user")
     cursor = match_collection.find({"user_id": user_id}).sort("created_at", -1)
     history = []
     async for doc in cursor:
@@ -182,13 +181,13 @@ async def get_match_history(user=Depends(get_current_user)):
             "job_posting_id": doc.get("job_posting_id"),
             "job_title": doc.get("job_title", "Belirtilmemiş Pozisyon"),
             "match_score": doc.get("match_score", 0),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+            "created_at": doc.get("created_at").isoformat() if isinstance(doc.get("created_at"), datetime) else doc.get("created_at")
         })
     return history
 
 @app.get("/api/v1/matches/{match_id}", tags=["Matching"])
 async def get_match_detail(match_id: str, user=Depends(get_current_user)):
-    user_id = user.get("sub", "default_user")
+    user_id = str(user.get("sub") or user.get("user_id") or "default_user")
     try:
         doc = await match_collection.find_one({"_id": ObjectId(match_id), "user_id": user_id})
     except Exception:
@@ -196,7 +195,10 @@ async def get_match_detail(match_id: str, user=Depends(get_current_user)):
     
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kayıt bulunamadı.")
+    
     doc["id"] = str(doc.pop("_id"))
+    if isinstance(doc.get("created_at"), datetime):
+        doc["created_at"] = doc["created_at"].isoformat()
     return doc
 
 
@@ -205,32 +207,49 @@ async def get_match_detail(match_id: str, user=Depends(get_current_user)):
 @app.get("/api/v1/cvs/latest", tags=["CV Operations"])
 async def get_latest_cv(user=Depends(get_current_user)):
     """Giriş yapan kullanıcının en güncel CV'sini döner."""
-    user_id = user.get("sub", "default_user")
+    user_id = str(user.get("sub") or user.get("user_id") or "default_user")
     cv = await cv_collection.find_one({"user_id": user_id}, sort=[("uploaded_at", -1)])
     if not cv:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kullanıcıya ait CV bulunamadı.")
+    
     cv["id"] = str(cv.pop("_id"))
+    if isinstance(cv.get("uploaded_at"), datetime):
+        cv["uploaded_at"] = cv["uploaded_at"].isoformat()
     return cv
 
 @app.get("/api/v1/users/{user_id}/cvs/latest", tags=["CV Operations"])
 async def get_latest_cv_by_user_id(user_id: str, user=Depends(get_current_user)):
     """Mülakat servisi için geriye dönük uyumluluk kapısı."""
+    token_user_id = str(user.get("sub") or user.get("user_id") or "")
+    
+    if token_user_id != str(user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu kullanıcının CV verilerine erişim yetkiniz yok."
+        )
+
     cv = await cv_collection.find_one({"user_id": user_id}, sort=[("uploaded_at", -1)])
     if not cv:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kullanıcıya ait CV bulunamadı.")
+    
     cv["id"] = str(cv.pop("_id"))
+    if isinstance(cv.get("uploaded_at"), datetime):
+        cv["uploaded_at"] = cv["uploaded_at"].isoformat()
     return cv
 
 @app.get("/api/v1/cvs/{cv_id}", tags=["CV Operations"])
 async def get_cv_by_id(cv_id: str, user=Depends(get_current_user)):
-    user_id = user.get("sub", "default_user")
+    user_id = str(user.get("sub") or user.get("user_id") or "default_user")
     try:
         cv = await cv_collection.find_one({"_id": ObjectId(cv_id), "user_id": user_id})
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Geçersiz cv_id.")
     if not cv:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="CV bulunamadı.")
+    
     cv["id"] = str(cv.pop("_id"))
+    if isinstance(cv.get("uploaded_at"), datetime):
+        cv["uploaded_at"] = cv["uploaded_at"].isoformat()
     return cv
 
 @app.get("/api/v1/job-postings/{job_posting_id}", tags=["Job Postings"])
@@ -238,5 +257,8 @@ async def get_job_posting(job_posting_id: str, user=Depends(get_current_user)):
     job = await job_collection.find_one({"_id": job_posting_id})
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="İş ilanı bulunamadı.")
+    
     job["id"] = str(job.pop("_id"))
+    if isinstance(job.get("created_at"), datetime):
+        job["created_at"] = job["created_at"].isoformat()
     return job

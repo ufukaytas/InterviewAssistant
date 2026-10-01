@@ -4,15 +4,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# .env dosyasından ayarları okur
-MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+# .env dosyasından okur; yoksa varsayılan Docker Compose ağına (mongodb) bağlanır
+MONGO_URI = os.getenv("MONGODB_URI", "mongodb://mongodb:27017")
 DB_NAME = os.getenv("MONGODB_DB_NAME", "profil_db")
 
-# MongoDB Asenkron İstemcisi
-client = AsyncIOMotorClient(MONGO_URI)
+# MongoDB Asenkron İstemcisi (5 saniye timeout ile)
+client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=5000)
 database = client[DB_NAME]
 
-# Koleksiyonlarımız (Tablolar)
+# Koleksiyonlar
 cv_collection = database.get_collection("cvs")
 job_collection = database.get_collection("job_postings")
 match_collection = database.get_collection("matches")
