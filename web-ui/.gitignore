@@ -1,0 +1,20 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Mac sistem dosyası
+.DS_Store
+
+# Node modülleri
+node_modules/
+
+# Derlenmiş (Build) dosyalar
+dist/
+dist-ssr/
+*.local
+
+# Gizli ortam değişkenleri
+.env
+.env.*
+!.env.example
