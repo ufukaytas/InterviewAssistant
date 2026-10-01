@@ -1,5 +1,3 @@
-// src/services/authService.js
-
 // Backend hazır olduğunda buradaki mock mantıklarını silip axios.post(...) kullanacağız.
 // Şimdilik sahte (mock) bir bekleme süresi oluşturuyoruz.
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -16,15 +14,16 @@ export const authService = {
   login: async (email, password) => {
     console.log("Giriş isteği atıldı (Mock):", { email, password });
     await delay(1000);
-    if (email === "baha@KariyerAI.com" && password === "password123") {
-      // Başarılı girişte sahte token'lar dönüyoruz
+    
+    // Gömülü şifre (hardcoded) kaldırıldı. Basit bir boşluk/format kontrolü yapılıyor.
+    if (email && email.includes("@") && password.length > 0) {
       return { 
         success: true, 
         accessToken: "mock_access_token_12345", 
         refreshToken: "mock_refresh_token_67890" 
       };
     }
-    throw new Error("Hatalı e-posta veya şifre!");
+    throw new Error("Lütfen geçerli bir e-posta ve şifre girin!");
   },
 
   // POST /api/v1/auth/Logout
@@ -39,6 +38,16 @@ export const authService = {
     console.log("Şifre sıfırlama linki gönderiliyor (Mock):", email);
     await delay(1000);
     return { success: true, message: "Doğrulama kodu e-postanıza gönderildi." };
+  },
+
+  // POST /api/v1/auth/ResetPassword (Mock Doğrulama)
+  verifyCode: async (code) => {
+    console.log("Kod doğrulanıyor (Mock):", code);
+    await delay(1000);
+    if (code && code.length >= 4) {
+       return { success: true, message: "Kod başarıyla doğrulandı." };
+    }
+    throw new Error("Hatalı doğrulama kodu girdiniz.");
   },
 
   // POST /api/v1/auth/GoogleLogin

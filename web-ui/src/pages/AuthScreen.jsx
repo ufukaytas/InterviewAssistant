@@ -4,9 +4,9 @@ import { authService } from '../services/authService';
 export default function AuthScreen({ onLogin }) {
   const [view, setView] = useState('login'); // 'login', 'register', 'forgot', 'verify'
   
-  // Form State'leri
-  const [email, setEmail] = useState('baha@KariyerAI.com');
-  const [password, setPassword] = useState('password123');
+  // Form State'leri (Gömülü kimlik bilgileri temizlendi)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -91,17 +91,17 @@ export default function AuthScreen({ onLogin }) {
     <div className="view active auth-wrapper">
       {/* --- GİRİŞ EKRANI --- */}
       {view === 'login' && (
-        <div className="login-card">
+        <div className="auth-card">
           <h1 className="auth-main-title">Kariyer AI</h1>
           <p className="auth-subtitle">Yapay zeka destekli analiz ve mülakat simülasyonu ile kariyerinize hazırlanın.</p>
           
           <div className="input-group">
             <label>E-posta Adresi</label>
-            <input type="email" className="input-field" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input type="email" className="input-field" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ornek@posta.com" />
           </div>
           <div className="input-group">
             <label>Şifre</label>
-            <input type="password" className="input-field" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input type="password" className="input-field" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Şifreniz" />
           </div>
           
           <button className="btn" style={{ width: '100%', marginTop: '10px' }} onClick={handleLogin} disabled={loading}>
@@ -129,7 +129,7 @@ export default function AuthScreen({ onLogin }) {
 
       {/* --- KAYIT EKRANI --- */}
       {view === 'register' && (
-        <div className="login-card">
+        <div className="auth-card">
           <h2>Hesap Oluştur</h2>
           <p className="subtitle">Mülakat hazırlıklarına hemen başlamak için bilgilerinizi girin.</p>
           
@@ -157,7 +157,7 @@ export default function AuthScreen({ onLogin }) {
 
       {/* --- ŞİFREMİ UNUTTUM EKRANI --- */}
       {view === 'forgot' && (
-        <div className="login-card">
+        <div className="auth-card">
           <h2>Şifre Sıfırlama</h2>
           <p className="subtitle">Hesabınıza bağlı e-posta adresini girin, size bir doğrulama kodu gönderelim.</p>
           <div className="input-group">
@@ -175,7 +175,7 @@ export default function AuthScreen({ onLogin }) {
 
       {/* --- KOD DOĞRULAMA EKRANI --- */}
       {view === 'verify' && (
-        <div className="login-card">
+        <div className="auth-card">
           <h2>Kodu Doğrula</h2>
           <p className="subtitle">E-posta adresinize gönderdiğimiz 6 haneli doğrulama kodunu girin.</p>
           <div className="input-group">
