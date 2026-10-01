@@ -1,0 +1,139 @@
+# InterviewAssistant - yerel geliştirme ortamı
+#
+# Kullanım:
+#   cp .env.example .env   # değerleri doldur
+#   docker compose up --build
+#
+# Host portları:
+#   web-ui            http://localhost:3011
+#   api-gateway       http://localhost:3010
+#   auth-service      http://localhost:3005  (Swagger: /swagger)
+#   profile-service   http://localhost:3006
+#   interview-service http://localhost:3007
+#   postgres          localhost:5432
+#   mongodb           localhost:27017
+
+# Auth servisinin token imzaladığı anahtar; gateway, profile ve interview aynı anahtarla doğrular.
+x-jwt-key: &jwt-key "${JWTSETTINGS_KEY:?JWTSETTINGS_KEY .env içinde tanımlı olmalı (en az 32 karakter)}"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth}
+      POSTGRES_USER: ${AUTH_DB_USER:-auth}
+      POSTGRES_PASSWORD: "${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD .env içinde tanımlı olmalı}"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongodb:
+    image: mongo:8
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Auth.API/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${AUTH_DB_NAME:-auth};Username=${AUTH_DB_USER:-auth};Password=${AUTH_DB_PASSWORD}"
+      JwtSettings__Key: *jwt-key
+      EmailSettings__Password: ${EMAIL_PASSWORD:-}
+      Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+    ports:
+      - "3005:8080"
+    depends_on:
+      # Servis açılışta EF Core migration'larını uygular.
+      postgres:
+        condition: service_healthy
+
+  profile-service:
+    build:
+      context: services/profile-service
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: profil_db
+      JWT_SECRET_KEY: *jwt-key
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_DEPLOYMENT_NAME: ${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-4.1-mini}
+    ports:
+      - "3006:3006"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3006/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  interview-service:
+    build:
+      context: services/interview-service
+    environment:
+      APP_ENV: development
+      MONGODB_URL: mongodb://mongodb:27017
+      MONGODB_DATABASE: interview_db
+      JWT_SECRET_KEY: *jwt-key
+      # Profile servisi 3006'da dinliyor (koddaki varsayılan :8080 değil).
+      PROFILE_SERVICE_URL: http://profile-service:3006
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      # Boş bırakılırsa servis offline stub ile çalışır.
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    ports:
+      - "3007:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      profile-service:
+        condition: service_started
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Gateway.API/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      JwtSettings__Key: *jwt-key
+      Cors__AllowedOrigins__0: http://localhost:3011
+      # appsettings.json'daki hostname'ler (auth.api, interview.api, cv.api) compose servis adlarına yönlendirilir.
+      ReverseProxy__Clusters__auth-cluster__Destinations__destination1__Address: http://auth-service:8080
+      ReverseProxy__Clusters__interview-cluster__Destinations__destination1__Address: http://interview-service:8080
+      ReverseProxy__Clusters__profile-cluster__Destinations__destination1__Address: http://profile-service:3006
+    ports:
+      - "3010:8080"
+    depends_on:
+      - auth-service
+      - profile-service
+      - interview-service
+
+  web-ui:
+    build:
+      context: web-ui
+      dockerfile: dockerfile
+    ports:
+      - "3011:80"
+    depends_on:
+      - api-gateway
+
+volumes:
+  postgres-data:
+  mongo-data:
