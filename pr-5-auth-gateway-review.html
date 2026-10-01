@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>PR #5: Auth &amp; Gateway İncelemesi</title>
+<style>
+/* layout: diff-ledger — a scannable stack of git-diff-style hunks, +/- coded */
+:root {
+  --bg:#f6f8fa; --surface:#ffffff; --surface-alt:#eef1f4; --border:#d8dee4;
+  --text:#1b1f24; --text-muted:#59636e;
+  --accent:#7e14ff; --accent-soft:#f1e6ff;
+  --good:#1a7f37; --good-soft:#daf7e3;
+  --kritik:#cf222e; --kritik-soft:#ffe9e8;
+  --guvenlik:#bc4c00; --guvenlik-soft:#fff1e6;
+  --kalite:#57606a; --kalite-soft:#eef1f4;
+  --not-c:#0969da; --not-soft:#ddf0ff;
+  --font-sans:'IBM Plex Sans',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'SF Mono',monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#0d1117; --surface:#161b22; --surface-alt:#1c2128; --border:#30363d;
+    --text:#e6edf3; --text-muted:#8b949e;
+    --accent:#b083ff; --accent-soft:rgba(176,131,255,.14);
+    --good:#3fb950; --good-soft:rgba(63,185,80,.14);
+    --kritik:#ff7b72; --kritik-soft:rgba(255,123,114,.14);
+    --guvenlik:#ffa657; --guvenlik-soft:rgba(255,166,87,.14);
+    --kalite:#8b949e; --kalite-soft:rgba(139,148,158,.14);
+    --not-c:#58a6ff; --not-soft:rgba(88,166,255,.14);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#0d1117; --surface:#161b22; --surface-alt:#1c2128; --border:#30363d;
+  --text:#e6edf3; --text-muted:#8b949e;
+  --accent:#b083ff; --accent-soft:rgba(176,131,255,.14);
+  --good:#3fb950; --good-soft:rgba(63,185,80,.14);
+  --kritik:#ff7b72; --kritik-soft:rgba(255,123,114,.14);
+  --guvenlik:#ffa657; --guvenlik-soft:rgba(255,166,87,.14);
+  --kalite:#8b949e; --kalite-soft:rgba(139,148,158,.14);
+  --not-c:#58a6ff; --not-soft:rgba(88,166,255,.14);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text); font-family: var(--font-sans);
+  padding-inline: 16px; padding-block: 40px;
+}
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+
+.wrap { max-width: 860px; margin: 0 auto; }
+
+header.page { margin-bottom: 28px; }
+.eyebrow {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: .06em;
+  color: var(--accent); text-transform: uppercase; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.eyebrow a { color: inherit; text-decoration: none; border-bottom: 1px solid currentColor; opacity: .85; }
+.eyebrow a:hover { opacity: 1; }
+h1 { font-size: clamp(24px, 4vw, 34px); line-height: 1.15; margin: 0 0 10px; text-wrap: balance; letter-spacing: -.01em; }
+.dek { color: var(--text-muted); font-size: 15px; line-height: 1.6; max-width: 62ch; margin: 0; }
+
+.meta-strip {
+  display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 20px; padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.meta-item { display: flex; flex-direction: column; gap: 2px; }
+.meta-item .n { font-family: var(--font-mono); font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+.meta-item .l { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.n.plus { color: var(--good); } .n.minus { color: var(--kritik); }
+
+.callout {
+  margin-top: 18px; padding: 12px 16px; border-radius: 10px;
+  background: var(--kritik-soft); border: 1px solid var(--kritik);
+  font-size: 13.5px; line-height: 1.6; color: var(--text);
+}
+.callout b { color: var(--kritik); }
+
+.filters {
+  display: flex; gap: 8px; flex-wrap: wrap; margin: 26px 0 22px;
+  padding-bottom: 18px; border-bottom: 1px solid var(--border);
+}
+.filters button {
+  font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
+  padding: 7px 13px; border-radius: 999px; transition: border-color .15s, color .15s, background .15s;
+}
+.filters button .count { opacity: .6; margin-left: 5px; }
+.filters button:hover { color: var(--text); border-color: var(--text-muted); }
+.filters button.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+.filters button.active .count { opacity: .75; }
+
+section.group { margin-bottom: 30px; }
+.group-title {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-muted); margin: 0 0 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.card {
+  display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--sev); border-radius: 10px; padding: 16px 18px; margin-bottom: 10px;
+}
+.glyph {
+  font-family: var(--font-mono); font-weight: 700; font-size: 14px; line-height: 1;
+  width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--sev-soft); color: var(--sev); margin-top: 1px;
+}
+.card-body { min-width: 0; flex: 1; }
+.card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.card-title { font-weight: 600; font-size: 15.5px; }
+.badge {
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--sev); background: var(--sev-soft);
+  padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+}
+.files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.file-chip {
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);
+  background: var(--surface-alt); border: 1px solid var(--border); border-radius: 5px;
+  padding: 2px 7px; overflow-wrap: anywhere;
+}
+.card p { margin: 0; font-size: 14px; line-height: 1.65; color: var(--text); }
+.card p + p { margin-top: 8px; }
+.card code {
+  font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-alt);
+  border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px;
+}
+
+.fix {
+  margin-top: 12px; padding: 11px 14px; border-radius: 8px;
+  background: var(--good-soft); border: 1px dashed var(--good);
+  display: flex; gap: 10px;
+}
+.fix .fix-label {
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--good); flex-shrink: 0; padding-top: 1px;
+}
+.fix p { font-size: 13.5px; line-height: 1.6; }
+
+footer.note {
+  margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--border);
+  font-size: 13px; color: var(--text-muted); line-height: 1.6;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page">
+    <div class="eyebrow">
+      <span>ufukaytas/InterviewAssistant</span>
+      <span>·</span>
+      <a href="https://github.com/ufukaytas/InterviewAssistant/pull/5" target="_blank" rel="noopener">PR #5 ↗</a>
+      <span>·</span>
+      <span>feature/add-auth-service-to-project → dev</span>
+      <span>·</span>
+      <span>WIP</span>
+    </div>
+    <h1>Auth Servisi &amp; API Gateway (YARP) — İnceleme</h1>
+    <p class="dek">.NET/CQRS tabanlı Auth servisi ile YARP tabanlı API Gateway'in incelemesi: doğru yapılanlar, tespit edilen sorunlar ve her biri için önerilen çözüm.</p>
+    <div class="meta-strip">
+      <div class="meta-item"><span class="n">64</span><span class="l">dosya değişti</span></div>
+      <div class="meta-item"><span class="n plus">+2332</span><span class="l">eklenen satır</span></div>
+      <div class="meta-item"><span class="n minus">−3</span><span class="l">silinen satır</span></div>
+      <div class="meta-item"><span class="n">4</span><span class="l">commit</span></div>
+      <div class="meta-item"><span class="n">ufukaytas, ozkanyllmaz</span><span class="l">yazarlar</span></div>
+    </div>
+    <div class="callout"><b>Genel izlenim:</b> Gateway katmanında güvenlik bilinci yüksek — X-User-Id spoofing koruması ve rate limiting düşünülmüş ve doğru uygulanmış. Ama Auth servisinin çekirdek bir güvenlik mekanizması — refresh token süresi/iptali — hiç kontrol edilmiyor: veri modeli hazır (IsExpired, IsActiveToken) ama hiçbir yerde okunmuyor. PR zaten WIP olarak açılmış; bu bulgu merge öncesi kapatılması gereken bir blocker.</div>
+  </header>
+
+  <nav class="filters" id="filters">
+    <button data-filter="all" class="active">Tümü <span class="count">15</span></button>
+    <button data-filter="good">Doğru <span class="count">8</span></button>
+    <button data-filter="kritik">Kritik <span class="count">1</span></button>
+    <button data-filter="kalite">Kalite <span class="count">5</span></button>
+    <button data-filter="not">Not <span class="count">1</span></button>
+  </nav>
+
+  <section class="group">
+    <h2 class="group-title">Doğru Yapılanlar</h2>
+    <div id="good-cards"></div>
+  </section>
+
+  <section class="group">
+    <h2 class="group-title">Sorunlar ve Çözümleri</h2>
+    <div id="issue-cards"></div>
+  </section>
+
+  <footer class="note">
+    Bu rapor PR #5'in <code style="font-family:var(--font-mono)">gh pr diff</code> çıktısının satır satır incelenmesiyle hazırlandı; herhangi bir dosya değiştirilmedi. "Not" etiketli madde, PR #3 (profile-service) ve PR #4 (interview-service) ile aradaki bir servis adı/port uyuşmazlığıyla ilgilidir.
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  var GOOD = [
+    {
+      title: "X-User-Id Spoofing Koruması",
+      files: ["api-gateway/Gateway.API/Program.cs"],
+      text: "Gateway, istemciden gelen X-User-Id header'ını proxy isteğinden siliyor ve değeri yalnızca doğrulanmış JWT'nin sub claim'inden yeniden set ediyor — arkadaki servisler kullanıcı kimliğine kör güvenemez durumda değil, Gateway'e güveniyor."
+    },
+    {
+      title: "İki Katmanlı Rate Limiting",
+      files: ["api-gateway/Gateway.API/Program.cs"],
+      text: "Auth route'ları için IP bazlı (dk/10, brute-force koruması), diğer API route'ları için kullanıcı (sub) bazlı (dk/100) ayrı rate limit politikaları tanımlanmış."
+    },
+    {
+      title: "Claim Adı Tutarlılığı Korunmuş",
+      files: ["api-gateway/Gateway.API/Program.cs"],
+      text: "MapInboundClaims = false ile ASP.NET'in 'sub' claim'ini varsayılan olarak uzun bir Microsoft URI'sine yeniden eşlemesi engellenmiş; Gateway ve mikroservisler (PR #4'teki interview-service dahil) arasında claim adı tutarlı kalıyor."
+    },
+    {
+      title: "JWT Anahtarı Koda Gömülmemiş",
+      files: ["api-gateway/Gateway.API/Program.cs", "appsettings.json"],
+      text: "JwtSettings:Key appsettings.json'da boş bırakılmış, gerçek değer env/secret'tan geliyor; Gateway ayrıca anahtar eksikse açık bir hata ile başlangıçta duruyor (fail-fast)."
+    },
+    {
+      title: "Parola Hashleme BCrypt İle Yapılıyor",
+      files: ["services/auth-service/external/Auth.Infrastructure/Security/PasswordHasher.cs"],
+      text: "Endüstri standardı BCrypt kullanılıyor; kendi yazılmış zayıf bir hash algoritması yok."
+    },
+    {
+      title: "Merkezi ve Sızdırmaz Hata Yönetimi",
+      files: ["services/auth-service/Auth.API/Middlewares/GlobalExceptionMiddleware.cs"],
+      text: "ValidationException 400'e, diğer tüm istisnalar generic bir 500 mesajına çevriliyor; client'a stack trace veya iç detay sızdırılmıyor."
+    },
+    {
+      title: "FluentValidation ile Merkezi Girdi Doğrulama",
+      files: ["Login/RegisterCommandValidator.cs", "Behaviors/ValidationBehavior.cs"],
+      text: "Email formatı, şifre karmaşıklığı (büyük/küçük harf, rakam) ve alan uzunlukları, MediatR pipeline'ındaki tek bir ValidationBehavior üzerinden merkezi olarak zorunlu kılınıyor."
+    },
+    {
+      title: "Katmanlı CQRS/MediatR Mimarisi",
+      files: ["services/auth-service/core/*", "services/auth-service/external/*"],
+      text: "Domain/Application/Infrastructure/API ayrımı, PR #4'teki interview-service'in katmanlı mimarisiyle tutarlı bir yaklaşım izliyor."
+    }
+  ];
+
+  var ISSUES = [
+    {
+      sev: "kritik", glyph: "!", label: "Kritik",
+      title: "Refresh Token Süresi/İptali Hiç Kontrol Edilmiyor",
+      files: ["RefreshTokenCommandHandler.cs", "RefreshTokenRepository.cs", "RefreshToken.cs"],
+      text: "RefreshToken varlığının hazır IsExpired ve IsActiveToken (RevokedDate == null && !IsExpired) computed property'leri var; ama GetRefreshTokenAsync yalnızca Token == token ile eşleşeni getiriyor (süre/iptal filtresi yok) ve RefreshTokenCommandHandler.Handle yalnızca existingToken == null kontrolü yapıyor. Sonuç: süresi dolmuş ya da zaten iptal edilmiş (örn. bir önceki refresh'te IsActive=false işaretlenmiş) bir refresh token, hâlâ yeni geçerli bir access token almak için kullanılabiliyor.",
+      fix: "Handle metodunun başına existingToken.IsActive == false || existingToken.IsExpired durumunda BusinessException fırlatan bir kontrol eklenmeli; performans için bu filtre repository sorgusuna da taşınabilir."
+    },
+    {
+      sev: "kalite", glyph: "·", label: "Kalite",
+      title: "Email Alanında Eşzamanlılık Koruması / Unique Kısıt Yok",
+      files: ["RegisterCommandHandler.cs", "Migrations/20260915134332_InitialMig.cs"],
+      text: "Kayıt akışı yalnızca uygulama seviyesinde ExistsUserByEmailAsync kontrolü yapıyor; migration'da Users.Email için bir unique index oluşturulmamış (yalnızca RefreshTokens/UserRoles için index var). Eşzamanlı iki kayıt isteği aynı email ile iki farklı kullanıcı oluşturabilir.",
+      fix: "Migration'a Users.Email üzerinde HasIndex(x => x.Email).IsUnique() ile bir unique index eklenmeli."
+    },
+    {
+      sev: "kalite", glyph: "·", label: "Kalite",
+      title: "Yapılandırma Doğrulaması Servisler Arasında Tutarsız",
+      files: ["services/auth-service/Auth.API/Program.cs", "api-gateway/Gateway.API/Program.cs"],
+      text: "Gateway, JwtSettings:Key boşsa açık bir InvalidOperationException ile anlaşılır şekilde başlangıçta duruyor; Auth.API'de aynı kontrol yok — appsettings.json'daki \"Key\": \"\" değeri env ile override edilmezse SymmetricSecurityKey oluşturulurken framework'ün kendi (daha az anlaşılır) bir ArgumentException'ıyla çöküyor.",
+      fix: "Auth.API'nin Program.cs'ine Gateway'dekiyle aynı açık doğrulama ve hata mesajı eklenmeli."
+    },
+    {
+      sev: "kalite", glyph: "·", label: "Kalite",
+      title: "Console.WriteLine ile Loglama",
+      files: ["Middlewares/GlobalExceptionMiddleware.cs"],
+      text: "Beklenmeyen istisnalar ILogger yerine Console.WriteLine ile yazdırılıyor; appsettings.json'da tanımlı Logging:LogLevel yapılandırmasını ve konteynerleştirilmiş ortamlarda log toplama altyapısını devre dışı bırakıyor.",
+      fix: "Middleware'e ILogger<GlobalExceptionMiddleware> enjekte edilip logger.LogError(exception, ...) kullanılmalı."
+    },
+    {
+      sev: "kalite", glyph: "·", label: "Kalite",
+      title: "Refresh Token Süresi İki Farklı Formülle Hesaplanıyor",
+      files: ["LoginCommandHandler.cs", "RefreshTokenCommandHandler.cs"],
+      text: "Login akışında yeni refresh token'ın ExpiresDate'i DateTime.UtcNow.AddDays(7); refresh akışında ise aynı alan newTokenDto.AccessTokenExpiration.AddDays(7) (yani \"şimdi + access token süresi + 7 gün\") olarak hesaplanıyor — iki akış aynı 7 günlük kuralı farklı taban noktalarından uyguluyor.",
+      fix: "Her iki handler da _settings.RefreshTokenExpireDays kullanan ortak bir yardımcı metodu paylaşmalı."
+    },
+    {
+      sev: "kalite", glyph: "·", label: "Kalite",
+      title: ".env.example Değişikliği Koda Henüz Bağlanmamış",
+      files: [".env.example", "services/auth-service/Auth.API/appsettings.json"],
+      text: "Bu PR .env.example'daki Auth DB alanlarını (AUTH_DB_NAME=auth_db, AUTH_DB_USER=postgres) günceliyor; ama appsettings.json'daki ConnectionStrings hâlâ elle Host=localhost;Port=5432;... olarak yazılı ve bu env değişkenlerinden hiçbir yerden enjekte edilmiyor.",
+      fix: "appsettings.json'daki ConnectionStrings, .env.example'daki AUTH_DB_* değişkenlerinden (ör. docker-compose üzerinden ConnectionStrings__DefaultConnection olarak) besleniyor hale getirilmeli."
+    },
+    {
+      sev: "not", glyph: "i", label: "Not",
+      title: "Üç PR Arasında Servis Adı/Port Tutarsızlığı",
+      files: ["Gateway.API/appsettings.json — ReverseProxy.Clusters", "PR #3 — profile-service Dockerfile", "PR #4 — interview-service config.py"],
+      text: "Gateway, profil servisine http://cv.api:8080 üzerinden ulaşmayı bekliyor; PR #4'teki interview-service ise aynı servise http://profile-service:8080 üzerinden ulaşmayı bekliyor; PR #3'teki profile-service'in kendi Dockerfile'ı ise container'ı 3006 portunda dinletiyor. Üç PR da aynı servis için farklı bir hostname/port varsayıyor ve bunları birleştiren bir docker-compose.yml henüz yok.",
+      fix: "Takım, servis adı ve port için tek bir sözleşmede anlaşmalı (ör. hepsi profile-service:8080) ve bunu ortak bir docker-compose.yml'de sabitlemeli — üç PR'ın da merge edilmesinden önce çözülmesi gereken bir entegrasyon riski."
+    }
+  ];
+
+  var SEV_VARS = {
+    kritik:    { c: "var(--kritik)",    s: "var(--kritik-soft)" },
+    guvenlik:  { c: "var(--guvenlik)",  s: "var(--guvenlik-soft)" },
+    kalite:    { c: "var(--kalite)",    s: "var(--kalite-soft)" },
+    not:       { c: "var(--not-c)",     s: "var(--not-soft)" }
+  };
+
+  function fileChips(files) {
+    return files.map(function (f) {
+      return '<span class="file-chip">' + f + '</span>';
+    }).join("");
+  }
+
+  function goodCardHTML(item) {
+    return '' +
+      '<div class="card" data-cat="good" style="--sev: var(--good); --sev-soft: var(--good-soft);">' +
+        '<div class="glyph">+</div>' +
+        '<div class="card-body">' +
+          '<div class="card-head"><span class="card-title">' + item.title + '</span></div>' +
+          '<div class="files">' + fileChips(item.files) + '</div>' +
+          '<p>' + item.text + '</p>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function issueCardHTML(item) {
+    var v = SEV_VARS[item.sev];
+    return '' +
+      '<div class="card" data-cat="' + item.sev + '" style="--sev: ' + v.c + '; --sev-soft: ' + v.s + ';">' +
+        '<div class="glyph">' + item.glyph + '</div>' +
+        '<div class="card-body">' +
+          '<div class="card-head">' +
+            '<span class="card-title">' + item.title + '</span>' +
+            '<span class="badge">' + item.label + '</span>' +
+          '</div>' +
+          '<div class="files">' + fileChips(item.files) + '</div>' +
+          '<p>' + item.text + '</p>' +
+          '<div class="fix"><span class="fix-label">Çözüm</span><p>' + item.fix + '</p></div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  document.getElementById("good-cards").innerHTML = GOOD.map(goodCardHTML).join("");
+  document.getElementById("issue-cards").innerHTML = ISSUES.map(issueCardHTML).join("");
+
+  var buttons = Array.prototype.slice.call(document.querySelectorAll("#filters button"));
+  var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
+  var groups = Array.prototype.slice.call(document.querySelectorAll("section.group"));
+
+  function applyFilter(f) {
+    cards.forEach(function (c) {
+      c.hidden = !(f === "all" || c.getAttribute("data-cat") === f);
+    });
+    groups.forEach(function (g) {
+      var visible = g.querySelectorAll(".card:not([hidden])").length > 0;
+      g.hidden = !visible;
+    });
+  }
+
+  buttons.forEach(function (b) {
+    b.addEventListener("click", function () {
+      buttons.forEach(function (x) { x.classList.remove("active"); });
+      b.classList.add("active");
+      applyFilter(b.getAttribute("data-filter"));
+    });
+  });
+})();
+</script>
+</body>
+</html>
