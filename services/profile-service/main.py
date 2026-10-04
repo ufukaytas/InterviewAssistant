@@ -1,5 +1,6 @@
 import io
-from uuid import uuid4
+import os
+import logging
 from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form
@@ -7,10 +8,13 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pypdf import PdfReader
 from bson import ObjectId
+from pydantic import ValidationError
 
 from auth import get_current_user, create_dev_token
 from database import cv_collection, job_collection, match_collection, ping_database
 from llm_service import analyze_job_and_cv
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Profile and CV Matching Service",
@@ -20,25 +24,26 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+raw_cors = os.getenv("CORS_ORIGINS", "http://localhost:3011,http://127.0.0.1:3011,http://localhost:3000")
+allowed_origins = [origin.strip() for origin in raw_cors.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3011", "http://127.0.0.1:3011", "http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# --- 1. SİSTEM VE GELİŞTİRİCİ KAPILARI ---
+MAX_FILE_SIZE = 5 * 1024 * 1024
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 
 @app.get("/health", tags=["System"])
 async def health_check():
-    """Liveness probe: Servisin çalıştığını doğrular."""
     return {"status": "ok"}
 
 @app.get("/ready", tags=["System"])
 async def ready_check():
-    """Readiness probe: MongoDB bağlantısını denetler."""
     db_alive = await ping_database()
     if not db_alive:
         raise HTTPException(
@@ -53,12 +58,13 @@ async def ready_check():
 
 @app.post("/dev/token", tags=["Development"])
 def generate_dev_token(user_id: str = "test-user-123"):
-    """Swagger'da test yapabilmek için geçici bearer token üretir."""
+    if ENVIRONMENT != "development":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not Found"
+        )
     token = create_dev_token(user_id=user_id)
     return {"access_token": token, "token_type": "bearer"}
-
-
-# --- 2. CV & İLAN EŞLEŞTİRME VE ANLAMSAL ANALİZ SERVİSİ (AI / LLM) ---
 
 @app.post("/api/v1/matches/analyze", tags=["Matching"])
 async def analyze_match(
@@ -68,15 +74,20 @@ async def analyze_match(
 ):
     user_id = str(user.get("sub") or user.get("user_id") or "default_user")
 
-    # PDF kontrolü ve metin çıkarma
     if not cv_file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Lütfen geçerli bir PDF dosyası yükleyin."
         )
 
+    pdf_bytes = await cv_file.read()
+    if len(pdf_bytes) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Dosya boyutu 5 MB sınırını aşamaz."
+        )
+
     try:
-        pdf_bytes = await cv_file.read()
         reader = PdfReader(io.BytesIO(pdf_bytes))
         cv_text = ""
         for page in reader.pages:
@@ -91,39 +102,33 @@ async def analyze_match(
             )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
+        logger.exception("PDF okuma hatası oluştu.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"PDF okuma hatası: {str(e)}"
+            detail="PDF belgesi işlenirken bir hata oluştu."
         )
 
-    # LLM ile analiz
     try:
         llm_output = await run_in_threadpool(analyze_job_and_cv, job_text, cv_text)
-    except Exception as e:
+    except ValidationError:
+        logger.exception("LLM çıktısı şema doğrulamadan geçemedi.")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"LLM Analiz Hatası: {str(e)}"
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Analiz servisinden geçersiz formatta yanıt alındı."
+        )
+    except Exception:
+        logger.exception("LLM analiz servisi çağrısında hata oluştu.")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Analiz servisi yanıt veremedi."
         )
 
     job_info = llm_output.get("job_details", {})
     analysis_info = llm_output.get("analysis", {})
 
-    match_score = analysis_info.get("match_score", 0)
-    matching_skills = analysis_info.get("matching_skills", [])
-    missing_skills = analysis_info.get("missing_skills", [])
-    feedback = analysis_info.get("feedback", "")
-    strong_matches = analysis_info.get("strong_matches", [])
-    improvements = analysis_info.get("improvements", [])
-    
-    cv_skills = analysis_info.get("cv_skills", matching_skills)
-
-    # 1. İlanı MongoDB'ye kaydet
-    job_id = f"job-{uuid4()}"
     job_title = job_info.get("title", "Yazılım Pozisyonu")
-    
     job_doc = {
-        "_id": job_id,
         "title": job_title,
         "seniority": job_info.get("seniority", "Junior"),
         "technical_skills": job_info.get("technical_skills", []),
@@ -131,29 +136,28 @@ async def analyze_match(
         "raw_text": job_text,
         "created_at": datetime.now(timezone.utc)
     }
-    await job_collection.insert_one(job_doc)
+    job_result = await job_collection.insert_one(job_doc)
+    job_id = str(job_result.inserted_id)
 
-    # 2. CV'yi MongoDB'ye kaydet
     cv_doc = {
         "user_id": user_id,
-        "skills": cv_skills,
+        "skills": analysis_info.get("cv_skills", analysis_info.get("matching_skills", [])),
         "raw_text": cv_text,
         "uploaded_at": datetime.now(timezone.utc)
     }
     cv_result = await cv_collection.insert_one(cv_doc)
 
-    # 3. Analiz sonucunu MongoDB'ye kaydet
     match_doc = {
         "user_id": user_id,
         "job_posting_id": job_id,
         "job_title": job_title,
         "cv_id": str(cv_result.inserted_id),
-        "match_score": match_score,
-        "matching_skills": matching_skills,
-        "missing_skills": missing_skills,
-        "feedback": feedback,
-        "strong_matches": strong_matches,
-        "improvements": improvements,
+        "match_score": analysis_info.get("match_score", 0),
+        "matching_skills": analysis_info.get("matching_skills", []),
+        "missing_skills": analysis_info.get("missing_skills", []),
+        "feedback": analysis_info.get("feedback", ""),
+        "strong_matches": analysis_info.get("strong_matches", []),
+        "improvements": analysis_info.get("improvements", []),
         "created_at": datetime.now(timezone.utc)
     }
     insert_res = await match_collection.insert_one(match_doc)
@@ -162,12 +166,12 @@ async def analyze_match(
         "match_id": str(insert_res.inserted_id),
         "job_posting_id": job_id,
         "job_title": job_title,
-        "match_score": match_score,
-        "matching_skills": matching_skills,
-        "missing_skills": missing_skills,
-        "feedback": feedback,
-        "strong_matches": strong_matches,
-        "improvements": improvements
+        "match_score": analysis_info.get("match_score", 0),
+        "matching_skills": analysis_info.get("matching_skills", []),
+        "missing_skills": analysis_info.get("missing_skills", []),
+        "feedback": analysis_info.get("feedback", ""),
+        "strong_matches": analysis_info.get("strong_matches", []),
+        "improvements": analysis_info.get("improvements", [])
     }
 
 @app.get("/api/v1/matches/history", tags=["Matching"])
@@ -178,7 +182,7 @@ async def get_match_history(user=Depends(get_current_user)):
     async for doc in cursor:
         history.append({
             "match_id": str(doc["_id"]),
-            "job_posting_id": doc.get("job_posting_id"),
+            "job_posting_id": str(doc.get("job_posting_id")),
             "job_title": doc.get("job_title", "Belirtilmemiş Pozisyon"),
             "match_score": doc.get("match_score", 0),
             "created_at": doc.get("created_at").isoformat() if isinstance(doc.get("created_at"), datetime) else doc.get("created_at")
@@ -201,12 +205,8 @@ async def get_match_detail(match_id: str, user=Depends(get_current_user)):
         doc["created_at"] = doc["created_at"].isoformat()
     return doc
 
-
-# --- 3. CV & İLAN ENTEGRASYON KAPILARI (MÜLAKAT SERVİSİ & UI İÇİN) ---
-
 @app.get("/api/v1/cvs/latest", tags=["CV Operations"])
 async def get_latest_cv(user=Depends(get_current_user)):
-    """Giriş yapan kullanıcının en güncel CV'sini döner."""
     user_id = str(user.get("sub") or user.get("user_id") or "default_user")
     cv = await cv_collection.find_one({"user_id": user_id}, sort=[("uploaded_at", -1)])
     if not cv:
@@ -219,9 +219,7 @@ async def get_latest_cv(user=Depends(get_current_user)):
 
 @app.get("/api/v1/users/{user_id}/cvs/latest", tags=["CV Operations"])
 async def get_latest_cv_by_user_id(user_id: str, user=Depends(get_current_user)):
-    """Mülakat servisi için geriye dönük uyumluluk kapısı."""
     token_user_id = str(user.get("sub") or user.get("user_id") or "")
-    
     if token_user_id != str(user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -254,7 +252,11 @@ async def get_cv_by_id(cv_id: str, user=Depends(get_current_user)):
 
 @app.get("/api/v1/job-postings/{job_posting_id}", tags=["Job Postings"])
 async def get_job_posting(job_posting_id: str, user=Depends(get_current_user)):
-    job = await job_collection.find_one({"_id": job_posting_id})
+    try:
+        job = await job_collection.find_one({"_id": ObjectId(job_posting_id)})
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Geçersiz job_posting_id.")
+        
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="İş ilanı bulunamadı.")
     
