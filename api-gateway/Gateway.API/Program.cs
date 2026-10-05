@@ -38,8 +38,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 // CORS (origin'ler appsettings'ten)
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                     ?? new[] { "http://localhost:3011" };
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+if (allowedOrigins is null || allowedOrigins.Length == 0)
+    throw new InvalidOperationException(
+        "Cors:AllowedOrigins tanımlı değil");
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactUI", policy => policy
