@@ -1,6 +1,8 @@
 using Auth.API.Middlewares;
 using Auth.Application;
+using Auth.Application.Interfaces;
 using Auth.Application.Mappings;
+using Auth.Domain.Entities;
 using Auth.Infrastructure;
 using Auth.Infrastructure.Contexts;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -92,9 +94,35 @@ app.MapControllers();
 
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
-    // Veritabanı yoksa oluşturur ve bekleyen tüm migration'ları uygular
-    dbContext.Database.Migrate();
+    var services = scope.ServiceProvider;
+    try
+    {
+        var dbContext = services.GetRequiredService<AuthDbContext>();
+        var passwordHasher = services.GetRequiredService<IPasswordHasher>();
+        // Veritabanı yoksa oluşturur ve bekleyen tüm migration'ları uygular
+        dbContext.Database.Migrate();
+
+        var testEmail = "test@gmail.com";
+        if (!dbContext.Users.Any(u => u.Email == testEmail))
+        {
+            var testUser = new User
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Test_User",
+                LastName = "Candidate",
+                Email = testEmail,
+                PasswordHash = passwordHasher.Hash("Password123"),
+                CreatedDate = DateTime.UtcNow
+            };
+            dbContext.Users.Add(testUser);
+            dbContext.SaveChanges();
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Veritabanına seed data eklenirken bir hata oluştu.");
+    }
 }
 
 app.Run();
