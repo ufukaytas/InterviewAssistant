@@ -107,22 +107,32 @@ class InterviewService:
             )
         if payload.cv_id:
             cv_raw = await self._profile_client.get_cv(payload.cv_id, auth_token)
-        elif not payload.job_posting_id:
-            # No explicit IDs supplied: best-effort fetch of the user's latest CV.
+        else:
+            # No explicit cv_id: best-effort fetch of the user's latest CV,
+            # regardless of whether a job_posting_id was supplied.
             try:
                 cv_raw = await self._profile_client.get_latest_cv(user_id, auth_token)
             except Exception:  # noqa: BLE001 - snapshot fetch is best-effort
                 cv_raw = {}
 
+        max_chars = self._settings.PROFILE_TEXT_MAX_CHARS
         return ProfileSnapshot(
             job_posting_id=payload.job_posting_id,
             cv_id=payload.cv_id,
             job_title=job_posting_raw.get("title"),
-            job_description=job_posting_raw.get("description"),
-            cv_summary=cv_raw.get("summary"),
+            job_description=self._truncate_text(job_posting_raw.get("description"), max_chars),
+            cv_summary=self._truncate_text(cv_raw.get("summary"), max_chars),
             raw_job_posting=job_posting_raw,
             raw_cv=cv_raw,
         )
+
+    @staticmethod
+    def _truncate_text(value: object, max_chars: int) -> Optional[str]:
+        """Cap externally supplied free text so LLM cost/latency stay bounded."""
+        if value is None:
+            return None
+        text = value if isinstance(value, str) else str(value)
+        return text if len(text) <= max_chars else text[:max_chars]
 
     async def _pick_pool_question_attempts(
         self, category: Optional[str], count: int
