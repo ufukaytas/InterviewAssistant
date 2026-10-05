@@ -136,6 +136,9 @@ services:
     build:
       context: web-ui
       dockerfile: dockerfile
+      args:
+        # Tarayıcı API'ye gateway'in host portundan ulaşır.
+        VITE_API_URL: http://localhost:3010
     ports:
       - "3011:80"
     depends_on:

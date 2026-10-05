@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3010';
 
 export const cvService = {
   // 1. Son CV Özetini Getirme (Mock)
