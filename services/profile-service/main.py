@@ -9,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pypdf import PdfReader
 from bson import ObjectId
 from pydantic import ValidationError
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from auth import get_current_user, create_dev_token
 from database import cv_collection, job_collection, match_collection, ping_database

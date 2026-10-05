@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SECRET_KEY = os.environ["JWT_SECRET_KEY"]
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "bu_anahtar_en_az_32_karakter_uzunlugunda_guvenli_bir_keydir_12345")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ISSUER = "auth-servisi"
 AUDIENCE = "mulakat-hazirlik"
