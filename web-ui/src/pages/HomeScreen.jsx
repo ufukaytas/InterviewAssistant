@@ -3,22 +3,20 @@ import { matchService } from '../services/matchService';
 import { interviewService } from '../services/interviewService'; 
 
 export default function HomeScreen({ onStartInterview }) {
-  // Input State'leri
+
   const [cvFile, setCvFile] = useState(null);
   const [cvName, setCvName] = useState('Dosya Seç veya Sürükle');
   const [jobText, setJobText] = useState('');
   
-  // UI State'leri
+
   const [cvStyle, setCvStyle] = useState({});
-  const [status, setStatus] = useState('idle'); // 'idle', 'analyzing', 'done'
+  const [status, setStatus] = useState('idle'); 
   const [progress, setProgress] = useState(0);
   const [analysisResult, setAnalysisResult] = useState(null);
   
-  // Geçmiş Mülakatlar için State'ler
   const [pastInterviews, setPastInterviews] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
-  // Sayfa yüklendiğinde geçmiş analizleri servisinden çek
   useEffect(() => {
     const fetchHistory = async () => {
       try {
@@ -35,7 +33,6 @@ export default function HomeScreen({ onStartInterview }) {
     fetchHistory();
   }, []);
 
-  // Dosya seçme işlemi (Gerçek input ile)
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -58,7 +55,6 @@ export default function HomeScreen({ onStartInterview }) {
     setStatus('analyzing');
     setProgress(0);
     
-    // API beklerken görsel bir animasyon başlat 
     let current = 0;
     const interval = setInterval(() => {
       current += 2;
@@ -66,12 +62,12 @@ export default function HomeScreen({ onStartInterview }) {
     }, 40);
 
     try {
-      // Mock API'ye (İleride gerçek backend'e) istek atıyoruz
+
       const res = await matchService.analyzeMatch(cvFile || 'mock.pdf', jobText);
       
       clearInterval(interval);
-      setProgress(res.score); // Backend'den dönen GERÇEK skoru bas
-      setAnalysisResult(res.analysis); // Backend'den dönen analizleri state'e at
+      setProgress(res.score); 
+      setAnalysisResult(res.analysis); 
       setStatus('done');
       
       setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);

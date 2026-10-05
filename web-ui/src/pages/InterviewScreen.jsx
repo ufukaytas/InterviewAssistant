@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { interviewService } from '../services/interviewService';
 
 export default function InterviewScreen({ onFinish, onCancel }) {
-  const [phase, setPhase] = useState('intro'); // 'intro', 'active'
+  const [phase, setPhase] = useState('intro'); 
   const [loading, setLoading] = useState(false);
   
-  // Mülakat Akış State'leri
   const [sessionId, setSessionId] = useState(null);
   const [currentQ, setCurrentQ] = useState(1);
   const [totalQ, setTotalQ] = useState(5);
@@ -15,7 +14,6 @@ export default function InterviewScreen({ onFinish, onCancel }) {
   const [timeLeft, setTimeLeft] = useState(120);
   const [answer, setAnswer] = useState('');
 
-  // 1. Ekran açıldığında (Mount) arka planda mülakat oturumunu oluştur
   useEffect(() => {
     const initSession = async () => {
       try {
@@ -31,13 +29,11 @@ export default function InterviewScreen({ onFinish, onCancel }) {
     initSession();
   }, []);
 
-  // Geri Sayım Mantığı (UI tarafı)
   useEffect(() => {
     let timer;
     if (phase === 'active' && timeLeft > 0 && !loading) {
       timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     } else if (timeLeft === 0 && phase === 'active' && !loading) {
-      // Süre bittiğinde otomatik pas geçmek veya uyarmak yerine sadece uyarı veriyoruz
       alert("Süreniz doldu! Lütfen cevabınızı tamamlayıp İleri butonuna basınız.");
     }
     return () => clearInterval(timer);
@@ -50,7 +46,6 @@ export default function InterviewScreen({ onFinish, onCancel }) {
     return `0${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // 2. Mülakatı Başlatma Akışı
   const handleStart = async () => {
     if (!sessionId) return alert("Oturum henüz hazır değil, lütfen 1-2 saniye bekleyin.");
     setLoading(true);
@@ -71,7 +66,6 @@ export default function InterviewScreen({ onFinish, onCancel }) {
     }
   };
 
-  // 3. İleri (Cevapla) veya Bitir Akışı
   const handleNext = async () => {
     if (!answer.trim()) return alert("Lütfen cevabınızı boş bırakmayınız. Boş bırakmak istiyorsanız Pas Geç butonunu kullanınız.");
     
@@ -98,7 +92,6 @@ export default function InterviewScreen({ onFinish, onCancel }) {
     }
   };
 
-  // 4. Pas Geçme Akışı
   const handleSkip = async () => {
     setLoading(true);
     try {
@@ -123,7 +116,6 @@ export default function InterviewScreen({ onFinish, onCancel }) {
     }
   };
 
-  // 5. Mülakatı Terk Etme (Sol Üst Geri Butonu)
   const handleAbandon = async () => {
     if (window.confirm("Mülakatı yarıda bırakmak istediğinize emin misiniz? (Oturum iptal edilecek)")) {
       if (sessionId) await interviewService.abandonInterview(sessionId);

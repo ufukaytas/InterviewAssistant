@@ -73,12 +73,12 @@ services:
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
       AZURE_OPENAI_DEPLOYMENT_NAME: ${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-4.1-mini}
     ports:
-      - "3006:3006"
+      - "3006:8080"
     depends_on:
       mongodb:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3006/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -128,7 +128,7 @@ services:
   web-ui:
     build:
       context: web-ui
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
     ports:
       - "3011:80"
     depends_on:

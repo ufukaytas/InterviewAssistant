@@ -2,76 +2,82 @@ import { useState } from 'react';
 import { authService } from '../services/authService';
 
 export default function AuthScreen({ onLogin }) {
-  const [view, setView] = useState('login'); // 'login', 'register', 'forgot', 'verify'
+  const [view, setView] = useState('login'); 
   
-  // Form State'leri (Gömülü kimlik bilgileri temizlendi)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 1. Giriş İşlemi
-  const handleLogin = async () => {
-    setLoading(true);
-    try {
-      const response = await authService.login(email, password);
-      if (response.success) {
-        onLogin(); // App.jsx'teki başarılı giriş fonksiyonunu tetikler
-      }
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  // 2. Google Giriş İşlemi
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    try {
-      const response = await authService.googleLogin();
-      if (response.success) onLogin();
-    } catch (error) {
-      alert("Google girişi başarısız.");
-    } finally {
-      setLoading(false);
+const handleLogin = async () => {
+  setLoading(true);
+  try {
+    const response = await authService.login(email, password);
+ 
+    if (response.isSuccessfull) {
+      onLogin();
+    } else {
+      alert(response.message || "Giriş başarısız.");
     }
-  };
+  } catch (error) {
+    const errorMsg = error.response?.data?.message || error.response?.data?.detail || "Bir hata oluştu.";
+    alert(errorMsg);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  // 3. Kayıt İşlemi
-  const handleRegister = async () => {
-    setLoading(true);
-    try {
-      const response = await authService.register({ name, email, password });
-      if (response.success) {
-        alert(response.message);
-        setView('login');
-      }
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setLoading(false);
+const handleGoogleLogin = async () => {
+  setLoading(true);
+  try {
+    const response = await authService.googleLogin();
+    if (response.isSuccessfull) {
+      onLogin();
+    } else {
+       alert(response.message || "Google girişi başarısız.");
     }
-  };
+  } catch (error) {
+    alert("Google girişi sırasında bir hata oluştu.");
+  } finally {
+    setLoading(false);
+  }
+};
 
-  // 4. Şifremi Unuttum İşlemi
-  const handleForgot = async () => {
-    setLoading(true);
-    try {
-      const response = await authService.forgotPassword(email);
-      if (response.success) {
-        alert(response.message);
-        setView('verify');
-      }
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setLoading(false);
+const handleRegister = async () => {
+  setLoading(true);
+  try {
+    const response = await authService.register({ name, email, password });
+    if (response.isSuccessfull) {
+      alert(response.message || "Kayıt başarılı! Lütfen giriş yapın.");
+      setView('login');
     }
-  };
+  } catch (error) {
+    const errorMsg = error.response?.data?.detail || error.response?.data?.message || "Kayıt işlemi başarısız.";
+    alert(errorMsg);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  // 5. Kod Doğrulama İşlemi
+const handleForgot = async () => {
+  setLoading(true);
+  try {
+    const response = await authService.forgotPassword(email);
+    if (response.isSuccessfull) {
+      alert(response.message || "Şifre sıfırlama kodu gönderildi.");
+      setView('verify');
+    }
+  } catch (error) {
+    const errorMsg = error.response?.data?.message || error.response?.data?.detail || "Bir hata oluştu.";
+    alert(errorMsg);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
   const handleVerify = async () => {
     setLoading(true);
     try {
@@ -89,7 +95,7 @@ export default function AuthScreen({ onLogin }) {
 
   return (
     <div className="view active auth-wrapper">
-      {/* --- GİRİŞ EKRANI --- */}
+   
       {view === 'login' && (
         <div className="auth-card">
           <h1 className="auth-main-title">Kariyer AI</h1>
@@ -127,7 +133,6 @@ export default function AuthScreen({ onLogin }) {
         </div>
       )}
 
-      {/* --- KAYIT EKRANI --- */}
       {view === 'register' && (
         <div className="auth-card">
           <h2>Hesap Oluştur</h2>
@@ -155,7 +160,6 @@ export default function AuthScreen({ onLogin }) {
         </div>
       )}
 
-      {/* --- ŞİFREMİ UNUTTUM EKRANI --- */}
       {view === 'forgot' && (
         <div className="auth-card">
           <h2>Şifre Sıfırlama</h2>
@@ -173,7 +177,6 @@ export default function AuthScreen({ onLogin }) {
         </div>
       )}
 
-      {/* --- KOD DOĞRULAMA EKRANI --- */}
       {view === 'verify' && (
         <div className="auth-card">
           <h2>Kodu Doğrula</h2>

@@ -9,16 +9,13 @@ function App() {
   const [currentView, setCurrentView] = useState('auth');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
-  // Mülakat sonucunu (raporu) tutacağımız state
   const [interviewReport, setInterviewReport] = useState(null);
 
-  // Mülakat bittiğinde çalışacak fonksiyon (Veriyi yakalar)
   const handleInterviewFinish = (reportData) => {
-    setInterviewReport(reportData); // Gelen raporu kaydet
-    setCurrentView('report');       // Rapor ekranına geç
+    setInterviewReport(reportData); 
+    setCurrentView('report');       
   };
   
-  // Çıkış yapma fonksiyonu
   const handleLogout = () => {
     setIsAuthenticated(false);
     setCurrentView('auth');
@@ -26,16 +23,13 @@ function App() {
   const handleGoToHistory = () => {
     if (!isAuthenticated) return;
     
-    // Önce Ana Sayfaya (home) geçiş yap
     setCurrentView('home');
     
-    // DOM'un (ekranın) render olması için çok kısa bir süre bekleyip aşağı kaydır
     setTimeout(() => {
       document.getElementById('past-interviews')?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
   };
 
-  // Hangi ekranın render edileceğini belirleyen fonksiyon
   const renderView = () => {
     switch (currentView) {
       case 'auth':
@@ -48,17 +42,15 @@ function App() {
       case 'home':
         return <HomeScreen onStartInterview={() => setCurrentView('interview')} />;
       case 'interview':
-        // DÜZELTME 1: onFinish olayını handleInterviewFinish fonksiyonuna bağladık
         return <InterviewScreen 
                  onFinish={handleInterviewFinish} 
                  onCancel={() => setCurrentView('home')} 
                />;
       case 'report':
-        // DÜZELTME 2: reportData prop'unu ekledik
         return <ReportScreen 
                  reportData={interviewReport} 
                  onReturnHome={() => {
-                   setInterviewReport(null); // Temizleyip eve dön
+                   setInterviewReport(null); 
                    setCurrentView('home');
                  }} 
                />;

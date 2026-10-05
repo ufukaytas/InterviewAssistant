@@ -1,5 +1,4 @@
 export default function ReportScreen({ reportData, onReturnHome }) {
-  // Eğer herhangi bir sebepten veri henüz gelmediyse veya boşsa hata vermemesi için güvenlik önlemi
   if (!reportData) {
     return (
       <div className="view active" style={{ alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
@@ -9,7 +8,6 @@ export default function ReportScreen({ reportData, onReturnHome }) {
     );
   }
 
-  // Toplam soru sayısını yanıtlanan ve pas geçilenlerden hesaplıyoruz
   const totalQuestions = (reportData.answered || 0) + (reportData.skipped || 0);
 
   return (
