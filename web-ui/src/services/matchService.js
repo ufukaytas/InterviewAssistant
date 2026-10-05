@@ -1,5 +1,5 @@
 // API_URL şimdilik durabilir, ileride kullanacağız
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3010'; 
 
 export const matchService = {
   // 1. CV Yükleme ve İlan Eşleştirme (Mock)
