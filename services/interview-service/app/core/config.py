@@ -43,12 +43,15 @@ class Settings(BaseSettings):
 
     # LLM provider. The key is a secret: set it ONLY via environment / .env.
     # When LLM_API_KEY is empty, an offline stub is used instead.
-    LLM_PROVIDER: Literal["anthropic", "openai", "azure_openai"] = "anthropic"
+    LLM_PROVIDER: Literal["anthropic", "openai", "openrouter", "azure_openai"] = "anthropic"
     LLM_API_KEY: Optional[SecretStr] = None
     LLM_MODEL: str = ""  # empty = provider default
     LLM_BASE_URL: str = ""  # empty = provider default
     LLM_TIMEOUT_SECONDS: float = 60.0
     LLM_MAX_TOKENS: int = 2000
+    # Upper bound (in characters) for job_description / cv_summary coming from the
+    # Profile Service before they are stored in the snapshot and sent to the LLM.
+    PROFILE_TEXT_MAX_CHARS: int = 6000
     # Required only when LLM_PROVIDER=azure_openai. LLM_MODEL is unused in that
     # case; Azure identifies the model via the deployment name in the URL.
     AZURE_OPENAI_DEPLOYMENT: str = "gpt-4.1-mini"

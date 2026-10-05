@@ -46,6 +46,8 @@ async def client(monkeypatch) -> AsyncIterator[httpx.AsyncClient]:
     # Swap the real Motor client for an in-memory mock before the app's
     # lifespan connects to "MongoDB".
     monkeypatch.setattr(mongodb_module, "AsyncIOMotorClient", AsyncMongoMockClient)
+    # Never let the suite pick up a real LLM key from .env: force the offline stub.
+    monkeypatch.setenv("LLM_API_KEY", "")
 
     app.dependency_overrides[get_profile_service_client] = lambda: FakeProfileServiceClient()
     get_settings.cache_clear()
