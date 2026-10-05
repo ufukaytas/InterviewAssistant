@@ -1,17 +1,29 @@
 import os
 import json
-from openai import AzureOpenAI
+from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-client = AzureOpenAI(
-    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview")
-)
+# Interview servisiyle aynı LLM_* değişkenleri; OpenAI uyumlu herhangi bir endpoint.
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL") or None
+LLM_MODEL = os.getenv("LLM_MODEL") or "google/gemma-4-31b"
+LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS") or 60)
 
-DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4.1-mini")
+_client = None
+
+
+def _get_client() -> OpenAI:
+    # Client ilk istekte oluşturulur: anahtar boşsa servis açılışta çökmez,
+    # yalnızca analiz isteği hata döner.
+    global _client
+    if _client is None:
+        if not LLM_API_KEY:
+            raise RuntimeError("LLM_API_KEY tanımlı değil")
+        _client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL, timeout=LLM_TIMEOUT_SECONDS)
+    return _client
+
 
 def analyze_job_and_cv(job_text: str, cv_text: str) -> dict:
     prompt = f"""
@@ -75,8 +87,8 @@ def analyze_job_and_cv(job_text: str, cv_text: str) -> dict:
     }}
     """
 
-    response = client.chat.completions.create(
-        model=DEPLOYMENT_NAME,
+    response = _get_client().chat.completions.create(
+        model=LLM_MODEL,
         messages=[
             {
                 "role": "system", 

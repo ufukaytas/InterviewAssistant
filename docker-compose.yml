@@ -69,9 +69,11 @@ services:
       MONGODB_URI: mongodb://mongodb:27017
       MONGODB_DB_NAME: profil_db
       JWT_SECRET_KEY: *jwt-key
-      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
-      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
-      AZURE_OPENAI_DEPLOYMENT_NAME: ${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-4.1-mini}
+      # Interview servisiyle aynı OpenAI uyumlu LLM ayarları.
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
     ports:
       - "3006:3006"
     depends_on:
@@ -98,6 +100,11 @@ services:
       # Boş bırakılırsa servis offline stub ile çalışır.
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-}
+      # Boş bırakılırsa provider'ın varsayılan URL'i kullanılır.
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-2000}
+      PROFILE_TEXT_MAX_CHARS: ${PROFILE_TEXT_MAX_CHARS:-6000}
     ports:
       - "3007:8080"
     depends_on:
