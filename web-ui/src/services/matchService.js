@@ -1,4 +1,5 @@
-import api from './api';
+// API_URL şimdilik durabilir, ileride kullanacağız
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
 
 export const matchService = {
   // 1. POST /api/v1/matches/analyze 

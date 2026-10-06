@@ -6,6 +6,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Vite, VITE_* değişkenlerini build anında bundle'a gömer; compose'dan build arg olarak gelir.
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 # Proje dosyalarını kopyala ve production için derle
 COPY . .
 RUN npm run build
