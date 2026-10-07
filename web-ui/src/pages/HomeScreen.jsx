@@ -8,10 +8,9 @@ export default function HomeScreen({ onStartInterview }) {
   const [cvName, setCvName] = useState('Dosya Seç veya Sürükle');
   const [jobText, setJobText] = useState('');
   
-
   const [cvStyle, setCvStyle] = useState({});
   const [status, setStatus] = useState('idle'); 
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(null); 
   const [analysisResult, setAnalysisResult] = useState(null);
   
   const [pastInterviews, setPastInterviews] = useState([]);
@@ -21,15 +20,15 @@ export default function HomeScreen({ onStartInterview }) {
     const fetchHistory = async () => {
       try {
         const res = await interviewService.getPastInterviews();
-        if (res.success) {
-          setPastInterviews(res.data);
-        }
+        const dataList = res.items || res.data || res;
+        setPastInterviews(dataList);
       } catch (error) {
-        console.error("Geçmiş kayıtlar alınamadı:", error);
+        console.error("Geçmiş mülakatlar çekilemedi:", error);
       } finally {
         setLoadingHistory(false);
       }
     };
+
     fetchHistory();
   }, []);
 
@@ -53,28 +52,18 @@ export default function HomeScreen({ onStartInterview }) {
     }
 
     setStatus('analyzing');
-    setProgress(0);
+    setProgress(null); // Sahte animasyonu kaldırdık, yüklenirken null kalacak
     
-    let current = 0;
-    const interval = setInterval(() => {
-      current += 2;
-      if (current <= 75) setProgress(current);
-    }, 40);
-
     try {
       const res = await matchService.analyzeMatch(cvFile || 'mock.pdf', jobText);
       
-      clearInterval(interval);
-      
-      // DEĞİŞEN KISIM BURASI:
-      setProgress(res.match_score); // res.score yerine res.match_score
-      setAnalysisResult(res);       // res.analysis yerine direkt res
+      setProgress(res.match_score); 
+      setAnalysisResult(res);       
       
       setStatus('done');
       
       setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
     } catch (error) {
-      clearInterval(interval);
       setStatus('idle');
       console.error("İşte gizlenen hata:", error);
       alert("Analiz sırasında bir hata oluştu.");
@@ -140,12 +129,15 @@ export default function HomeScreen({ onStartInterview }) {
       {status !== 'idle' && (
         <div id="analysis-section" style={{ display: 'block', width: '100%', borderTop: '1px dashed var(--border)', paddingTop: '40px', marginTop: '10px' }}>
           <div className="anim-container" style={{ marginBottom: '40px' }}>
-            <div className="progress-circle" style={{ background: `conic-gradient(var(--primary) ${progress}%, var(--border) 0%)` }}>
+            
+            {/* ÇEMBER DÜZENLEMESİ: Yüklenirken gri çember ve "..." gösteriyor */}
+            <div className="progress-circle" style={{ background: status === 'done' ? `conic-gradient(var(--primary) ${progress}%, var(--border) 0%)` : 'var(--border)' }}>
               <div className="progress-inner">
-                <span className="pct-num">{progress}%</span>
-                <span className="pct-label">UYUM SKORU</span>
+                <span className="pct-num">{status === 'done' ? `${progress}%` : '...'}</span>
+                <span className="pct-label">{status === 'done' ? 'UYUM SKORU' : 'ANALİZ EDİLİYOR'}</span>
               </div>
             </div>
+            
             <p style={{ marginTop: '24px', color: status === 'done' ? 'var(--success)' : 'var(--text-muted)', fontWeight: 500 }}>
               {status === 'done' ? 'Analiz Tamamlandı!' : 'Yapay Zeka Verileri İşliyor...'}
             </p>
@@ -155,7 +147,6 @@ export default function HomeScreen({ onStartInterview }) {
             <div style={{ animation: 'fadeIn 0.6s ease' }}>
               
               <p style={{ textAlign: 'center', marginBottom: '20px', fontSize: '1.1rem' }}>
-                {/* recommendation yerine feedback */}
                 {analysisResult.feedback} 
               </p>
 
@@ -163,7 +154,6 @@ export default function HomeScreen({ onStartInterview }) {
                 <div className="pm-card">
                   <div className="pm-header plus">Güçlü Eşleşmeler</div>
                   <ul className="pm-list">
-                    {/* matched_skills yerine matching_skills */}
                     {analysisResult.matching_skills.map((skill, index) => (
                       <li key={`matched-${index}`}>
                         <div className="pm-icon plus">+</div>
@@ -175,7 +165,6 @@ export default function HomeScreen({ onStartInterview }) {
                 <div className="pm-card">
                   <div className="pm-header minus">Geliştirilmesi Gerekenler</div>
                   <ul className="pm-list">
-                    {/* Bu zaten doğruydu, aynı kalıyor */}
                     {analysisResult.missing_skills.map((skill, index) => (
                       <li key={`missing-${index}`}>
                         <div className="pm-icon minus">-</div>
@@ -189,7 +178,6 @@ export default function HomeScreen({ onStartInterview }) {
               <button 
                 className="btn" 
                 style={{ padding: '16px 48px', borderRadius: '100px', fontSize: '16px', background: 'var(--success)' }} 
-                // DEĞİŞEN KISIM: match_id yerine job_posting_id yolluyoruz
                 onClick={() => onStartInterview(analysisResult.job_posting_id)}
               >
                 Mülakata Geç
@@ -200,6 +188,7 @@ export default function HomeScreen({ onStartInterview }) {
         </div>
       )}
 
+      {/* GEÇMİŞ MÜLAKATLAR ALANI (Şema hataları giderildi) */}
       <div className="history-section" id="past-interviews" style={{ display: 'block', width: '100%', marginTop: '40px' }}>
         <div className="history-header">Önceki Mülakat Kayıtları</div>
         <div className="history-list">
@@ -207,16 +196,16 @@ export default function HomeScreen({ onStartInterview }) {
             <p style={{ color: 'var(--text-muted)', padding: '20px 0' }}>Kayıtlar yükleniyor...</p>
           ) : pastInterviews.length > 0 ? (
             pastInterviews.map((item) => (
-              <div className="history-item" key={item.session_id}>
+              <div className="history-item" key={item.id}>
                 <div className="history-info">
-                  <h4>{item.title}</h4>
-                  <p>{item.date}</p>
+                  <h4>{item.title || "Yapay Zeka Mülakatı"}</h4>
+                  <p>{item.created_at ? new Date(item.created_at).toLocaleDateString('tr-TR') : 'Tarih Yok'}</p>
                 </div>
                 <div 
                   className="history-score" 
-                  style={item.score < 70 ? { background: 'rgba(245, 158, 11, 0.15)', color: 'var(--warning)' } : {}}
+                  style={item.overall_score !== undefined && item.overall_score < 70 ? { background: 'rgba(245, 158, 11, 0.15)', color: 'var(--warning)' } : {}}
                 >
-                  %{item.score} Uyum
+                  {item.overall_score !== undefined ? `%${Math.round(item.overall_score)} Uyum` : '% Uyum'}
                 </div>
               </div>
             ))

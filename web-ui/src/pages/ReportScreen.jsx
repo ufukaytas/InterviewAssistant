@@ -1,5 +1,6 @@
 export default function ReportScreen({ reportData, onReturnHome }) {
-  if (!reportData) {
+  // 1. Veri kontrolü: Hem ana veri hem de feedback alt kutusu var mı diye bakıyoruz
+  if (!reportData || !reportData.feedback) {
     return (
       <div className="view active" style={{ alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
         <p>Rapor verisi bulunamadı veya yükleniyor...</p>
@@ -8,7 +9,18 @@ export default function ReportScreen({ reportData, onReturnHome }) {
     );
   }
 
-  const totalQuestions = (reportData.answered || 0) + (reportData.skipped || 0);
+  // 2. Backend'den gelen verileri parçalayıp kolay değişkenlere atıyoruz
+  const feedback = reportData.feedback;
+  const questions = reportData.questions || [];
+
+  const score = Math.round(feedback.overall_score || 0);
+  const totalQuestions = questions.length;
+  const answeredCount = questions.filter(q => q.status === 'answered').length;
+  const skippedCount = questions.filter(q => q.status === 'skipped').length;
+
+  // Harcanan toplam süreyi saniye cinsinden toplayıp Dakika:Saniye formatına çeviriyoruz
+  const totalSeconds = questions.reduce((acc, q) => acc + (q.elapsed_seconds || 0), 0);
+  const timeSpent = `${Math.floor(totalSeconds / 60)} dk ${totalSeconds % 60} sn`;
 
   return (
     <div className="view active" style={{ alignItems: 'center' }}>
@@ -18,28 +30,32 @@ export default function ReportScreen({ reportData, onReturnHome }) {
       </div>
 
       <div className="report-score-box">
-        <div className="score-val">%{reportData.score}</div>
+        <div className="score-val">%{score}</div>
         <div className="score-text">
           <h4>Genel Doğruluk Skoru</h4>
           <p>
-            {reportData.score >= 80 
+            {score >= 80 
               ? "Harika bir iş çıkardınız! Soruların büyük bir kısmına tatmin edici ve doğru yanıtlar verdiniz." 
               : "Bazı konularda eksikleriniz olsa da genel olarak iyi bir performans sergilediniz."}
+          </p>
+          {/* Yapay Zekanın özel özeti buraya eklendi */}
+          <p style={{ marginTop: '12px', fontSize: '0.95rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            "{feedback.summary}"
           </p>
         </div>
       </div>
 
       <div className="stats-grid">
         <div className="stat-box">
-          <div className="stat-val">{reportData.time_spent}</div>
+          <div className="stat-val">{timeSpent}</div>
           <div className="stat-label">Toplam Süre</div>
         </div>
         <div className="stat-box">
-          <div className="stat-val">{reportData.answered}/{totalQuestions}</div>
+          <div className="stat-val">{answeredCount}/{totalQuestions}</div>
           <div className="stat-label">Yanıtlanan Soru</div>
         </div>
         <div className="stat-box">
-          <div className="stat-val">{reportData.skipped}</div>
+          <div className="stat-val">{skippedCount}</div>
           <div className="stat-label">Pas Geçilen</div>
         </div>
       </div>
@@ -48,8 +64,8 @@ export default function ReportScreen({ reportData, onReturnHome }) {
         <div className="pm-card">
           <div className="pm-header plus">Başarılı Yanıtlar (Doğru)</div>
           <ul className="pm-list">
-            {reportData.positives && reportData.positives.length > 0 ? (
-              reportData.positives.map((item, index) => (
+            {feedback.strengths && feedback.strengths.length > 0 ? (
+              feedback.strengths.map((item, index) => (
                 <li key={`pos-${index}`}>
                   <div className="pm-icon plus">+</div>
                   <div>{item}</div>
@@ -63,8 +79,8 @@ export default function ReportScreen({ reportData, onReturnHome }) {
         <div className="pm-card">
           <div className="pm-header minus">Hatalı / Eksik Yanıtlar</div>
           <ul className="pm-list">
-            {reportData.negatives && reportData.negatives.length > 0 ? (
-              reportData.negatives.map((item, index) => (
+            {feedback.improvements && feedback.improvements.length > 0 ? (
+              feedback.improvements.map((item, index) => (
                 <li key={`neg-${index}`}>
                   <div className="pm-icon minus">-</div>
                   <div>{item}</div>
