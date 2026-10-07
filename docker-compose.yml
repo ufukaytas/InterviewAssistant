@@ -75,12 +75,12 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
     ports:
-      - "3006:3006"
+      - "3006:8080"
     depends_on:
       mongodb:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3006/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -136,9 +136,6 @@ services:
     build:
       context: web-ui
       dockerfile: dockerfile
-      args:
-        # Tarayıcı API'ye gateway'in host portundan ulaşır.
-        VITE_API_URL: http://localhost:3010
     ports:
       - "3011:80"
     depends_on:
