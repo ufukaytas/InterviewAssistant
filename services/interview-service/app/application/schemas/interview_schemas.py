@@ -14,7 +14,9 @@ from app.domain.enums.interview_status import (
 
 
 class InterviewCreateRequest(BaseModel):
-    title: str = Field(min_length=1, max_length=200, default="Interview Session")
+    # Verilmezse (ya da boş gönderilirse) backend anlamlı bir başlık üretir:
+    # önce Profile Service'ten gelen iş ilanı başlığı, yoksa tarih/saat.
+    title: Optional[str] = Field(default=None, max_length=200)
     job_posting_id: Optional[str] = None
     cv_id: Optional[str] = None
     question_count: Optional[int] = Field(default=None, ge=1, le=50)
@@ -68,6 +70,7 @@ class InterviewSummaryResponse(BaseModel):
     title: str
     status: InterviewStatus
     total_questions: int
+    overall_score: Optional[float] = None
     created_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
