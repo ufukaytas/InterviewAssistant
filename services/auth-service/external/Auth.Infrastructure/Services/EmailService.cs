@@ -80,7 +80,7 @@ namespace Auth.Infrastructure.Services
 
           <tr>
             <td style=""background-color:#f8fafc;padding:18px 32px;text-align:center;"">
-              <span style=""font-size:11.5px;color:#94a3b8;"">Bu e-posta Kariyer Network tarafından otomatik olarak gönderilmiştir.</span>
+              <span style=""font-size:11.5px;color:#94a3b8;"">Bu e-posta Interview Asistant Destek tarafından otomatik olarak gönderilmiştir.</span>
             </td>
           </tr>
 
@@ -91,7 +91,7 @@ namespace Auth.Infrastructure.Services
 </body>
 </html>",
 
-                TextBody = $@"Şifre Sıfırlama Talebi - Kariyer Network
+                TextBody = $@"Şifre Sıfırlama Talebi - Interview Asistant
 
 Hesabın için bir şifre sıfırlama talebi aldık.
 Sıfırlama kodun: {resetToken}

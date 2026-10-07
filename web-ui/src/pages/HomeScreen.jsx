@@ -62,18 +62,21 @@ export default function HomeScreen({ onStartInterview }) {
     }, 40);
 
     try {
-
       const res = await matchService.analyzeMatch(cvFile || 'mock.pdf', jobText);
       
       clearInterval(interval);
-      setProgress(res.score); 
-      setAnalysisResult(res.analysis); 
+      
+      // DEĞİŞEN KISIM BURASI:
+      setProgress(res.match_score); // res.score yerine res.match_score
+      setAnalysisResult(res);       // res.analysis yerine direkt res
+      
       setStatus('done');
       
       setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
     } catch (error) {
       clearInterval(interval);
       setStatus('idle');
+      console.error("İşte gizlenen hata:", error);
       alert("Analiz sırasında bir hata oluştu.");
     }
   };
@@ -152,14 +155,16 @@ export default function HomeScreen({ onStartInterview }) {
             <div style={{ animation: 'fadeIn 0.6s ease' }}>
               
               <p style={{ textAlign: 'center', marginBottom: '20px', fontSize: '1.1rem' }}>
-                {analysisResult.recommendation}
+                {/* recommendation yerine feedback */}
+                {analysisResult.feedback} 
               </p>
 
               <div className="plus-minus-grid">
                 <div className="pm-card">
                   <div className="pm-header plus">Güçlü Eşleşmeler</div>
                   <ul className="pm-list">
-                    {analysisResult.matched_skills.map((skill, index) => (
+                    {/* matched_skills yerine matching_skills */}
+                    {analysisResult.matching_skills.map((skill, index) => (
                       <li key={`matched-${index}`}>
                         <div className="pm-icon plus">+</div>
                         <div><b>{skill}</b> yetkinliği ilanla örtüşüyor.</div>
@@ -170,6 +175,7 @@ export default function HomeScreen({ onStartInterview }) {
                 <div className="pm-card">
                   <div className="pm-header minus">Geliştirilmesi Gerekenler</div>
                   <ul className="pm-list">
+                    {/* Bu zaten doğruydu, aynı kalıyor */}
                     {analysisResult.missing_skills.map((skill, index) => (
                       <li key={`missing-${index}`}>
                         <div className="pm-icon minus">-</div>
@@ -179,11 +185,16 @@ export default function HomeScreen({ onStartInterview }) {
                   </ul>
                 </div>
               </div>
-              <div className="proceed-btn-container" style={{ marginBottom: '60px' }}>
-                <button className="btn" style={{ padding: '16px 48px', borderRadius: '100px', fontSize: '16px', background: 'var(--success)' }} onClick={onStartInterview}>
-                  Mülakata Geç
-                </button>
-              </div>
+               <div className="proceed-btn-container" style={{ marginBottom: '60px' }}>
+              <button 
+                className="btn" 
+                style={{ padding: '16px 48px', borderRadius: '100px', fontSize: '16px', background: 'var(--success)' }} 
+                // DEĞİŞEN KISIM: match_id yerine job_posting_id yolluyoruz
+                onClick={() => onStartInterview(analysisResult.job_posting_id)}
+              >
+                Mülakata Geç
+              </button>
+            </div>
             </div>
           )}
         </div>

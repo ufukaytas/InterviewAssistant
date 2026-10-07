@@ -10,6 +10,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   const [interviewReport, setInterviewReport] = useState(null);
+  const [activeMatchId, setActiveMatchId] = useState(null); 
 
   const handleInterviewFinish = (reportData) => {
     setInterviewReport(reportData); 
@@ -20,6 +21,7 @@ function App() {
     setIsAuthenticated(false);
     setCurrentView('auth');
   };
+  
   const handleGoToHistory = () => {
     if (!isAuthenticated) return;
     
@@ -40,9 +42,15 @@ function App() {
                  }} 
                />;
       case 'home':
-        return <HomeScreen onStartInterview={() => setCurrentView('interview')} />;
+        return <HomeScreen 
+                 onStartInterview={(id) => {
+                   setActiveMatchId(id); 
+                   setCurrentView('interview');
+                 }} 
+               />;
       case 'interview':
         return <InterviewScreen 
+                 matchId={activeMatchId} 
                  onFinish={handleInterviewFinish} 
                  onCancel={() => setCurrentView('home')} 
                />;

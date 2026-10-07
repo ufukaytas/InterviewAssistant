@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { interviewService } from '../services/interviewService';
 
-export default function InterviewScreen({ onFinish, onCancel }) {
+// 1. matchId'yi props olarak içeri alıyoruz
+export default function InterviewScreen({ matchId, onFinish, onCancel }) {
   const [phase, setPhase] = useState('intro'); 
   const [loading, setLoading] = useState(false);
   
@@ -16,18 +17,38 @@ export default function InterviewScreen({ onFinish, onCancel }) {
 
   useEffect(() => {
     const initSession = async () => {
+      // Eğer matchId yoksa backend soru üretemez, bunu engelliyoruz.
+      if (!matchId) {
+        console.error("Match ID eksik! Mülakat başlatılamaz.");
+        return;
+      }
+
       try {
-        const res = await interviewService.createSession({ questionCount: 5 });
-        if (res.success) {
-          setSessionId(res.session_id);
-          setTotalQ(res.total_questions);
+        // 2. Backend'e AI'dan soru üretmesi için gerekli tüm verileri yolluyoruz
+        const res = await interviewService.createSession({ 
+          job_posting_id: matchId, // HomeScreen'den artık job_posting_id geliyor
+          question_count: 5,
+          use_generated_questions: true // Sihirli kelime!
+        });
+        
+        console.log("Mülakat Oturumu Kuruldu:", res);
+
+        // DEĞİŞEN KISIM: res.session_id yerine res.id arıyoruz
+        if (res.id) { 
+          setSessionId(res.id);
+          // Backend total_questions yerine soruları dizi olarak yollamış, sayısını alıyoruz:
+          setTotalQ(res.questions ? res.questions.length : 5); 
+          console.log("Session ID başarıyla ayarlandı:", res.id);
+        } else {
+          console.error("Backend yanıtında id bulunamadı:", res);
         }
       } catch (error) {
         console.error("Oturum oluşturulamadı:", error);
       }
     };
+    
     initSession();
-  }, []);
+  }, [matchId]); // matchId değiştiğinde çalışması için
 
   useEffect(() => {
     let timer;
@@ -47,19 +68,24 @@ export default function InterviewScreen({ onFinish, onCancel }) {
   };
 
   const handleStart = async () => {
-    if (!sessionId) return alert("Oturum henüz hazır değil, lütfen 1-2 saniye bekleyin.");
+    if (!sessionId) return alert("Oturum henüz hazırlanıyor...");
+    
     setLoading(true);
     try {
       await interviewService.startInterview(sessionId);
       const qRes = await interviewService.getCurrentQuestion(sessionId);
       
-      setQuestionId(qRes.question_id);
-      setQuestionText(qRes.text);
-      setTimeLeft(qRes.remaining_sec || 120);
+      // Backend veriyi 'question' objesinin içinde yolluyor, onu alıyoruz:
+      const currentQ = qRes.question;
       
-      await interviewService.startQuestionTimer(sessionId, qRes.question_id);
+      setQuestionId(currentQ.question_id);
+      setQuestionText(currentQ.text);
+      setTimeLeft(currentQ.time_limit_seconds || 120); // remaining_seconds yerine time_limit_seconds
+      
+      await interviewService.startQuestionTimer(sessionId, currentQ.question_id);
       setPhase('active');
     } catch (error) {
+      console.error(error);
       alert("Mülakat başlatılırken bir hata oluştu.");
     } finally {
       setLoading(false);
@@ -72,20 +98,25 @@ export default function InterviewScreen({ onFinish, onCancel }) {
     setLoading(true);
     try {
       if (currentQ < totalQ) {
-        const res = await interviewService.submitAnswer(sessionId, questionId, { answer });
+        await interviewService.submitAnswer(sessionId, questionId, { answer_text: answer });
         
-        setQuestionId(res.next_question.question_id);
-        setQuestionText(res.next_question.text);
+        const qRes = await interviewService.getCurrentQuestion(sessionId);
+        const nextQ = qRes.question;
+        
+        setQuestionId(nextQ.question_id);
+        setQuestionText(nextQ.text);
         setCurrentQ((prev) => prev + 1);
-        setTimeLeft(120);
+        setTimeLeft(nextQ.time_limit_seconds || 120);
         setAnswer('');
         
-        await interviewService.startQuestionTimer(sessionId, res.next_question.question_id);
+        await interviewService.startQuestionTimer(sessionId, nextQ.question_id);
       } else {
+        await interviewService.submitAnswer(sessionId, questionId, { answer_text: answer });
         const res = await interviewService.completeInterview(sessionId);
-        onFinish(res.report); 
+        onFinish(res); 
       }
     } catch (error) {
+      console.error(error);
       alert("İşlem sırasında hata oluştu.");
     } finally {
       setLoading(false);
@@ -96,20 +127,25 @@ export default function InterviewScreen({ onFinish, onCancel }) {
     setLoading(true);
     try {
       if (currentQ < totalQ) {
-        const res = await interviewService.skipQuestion(sessionId, questionId);
+        await interviewService.skipQuestion(sessionId, questionId);
         
-        setQuestionId(res.next_question.question_id);
-        setQuestionText(res.next_question.text);
+        const qRes = await interviewService.getCurrentQuestion(sessionId);
+        const nextQ = qRes.question;
+        
+        setQuestionId(nextQ.question_id);
+        setQuestionText(nextQ.text);
         setCurrentQ((prev) => prev + 1);
-        setTimeLeft(120);
+        setTimeLeft(nextQ.time_limit_seconds || 120);
         setAnswer('');
         
-        await interviewService.startQuestionTimer(sessionId, res.next_question.question_id);
+        await interviewService.startQuestionTimer(sessionId, nextQ.question_id);
       } else {
+        await interviewService.skipQuestion(sessionId, questionId);
         const res = await interviewService.completeInterview(sessionId);
-        onFinish(res.report);
+        onFinish(res);
       }
     } catch (error) {
+      console.error(error);
       alert("Hata oluştu.");
     } finally {
       setLoading(false);
@@ -138,8 +174,9 @@ export default function InterviewScreen({ onFinish, onCancel }) {
               <div className="rule-box"><h4>0{totalQ}</h4><span>Toplam Soru</span></div>
               <div className="rule-box"><h4>02:00</h4><span>Soru Başına Süre</span></div>
             </div>
+            
             <button className="btn" style={{ width: '100%', padding: '18px', fontSize: '18px' }} onClick={handleStart} disabled={loading || !sessionId}>
-              {loading ? 'Hazırlanıyor...' : 'Simülasyonu Başlat'}
+              {loading ? 'Hazırlanıyor...' : (!sessionId ? 'Sorular Üretiliyor...' : 'Simülasyonu Başlat')}
             </button>
           </div>
         </div>

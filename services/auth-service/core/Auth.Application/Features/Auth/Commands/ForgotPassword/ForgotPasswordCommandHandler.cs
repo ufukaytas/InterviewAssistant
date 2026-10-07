@@ -33,6 +33,8 @@ namespace Auth.Application.Features.Auth.Commands.ForgotPassword
             user.ResetToken = resetToken;
             user.PasswordResetTokenExpiry = DateTime.UtcNow.AddMinutes(expiryMinutes);
 
+            await _emailService.SendPasswordResetEmailAsync(request.Email, resetToken, expiryMinutes);
+
             _userRepository.Update(user);
             await _unitOfWork.SaveChangesAsync();
 

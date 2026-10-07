@@ -1,30 +1,41 @@
-// API_URL şimdilik durabilir, ileride kullanacağız
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3010';
 
 export const matchService = {
-  // 1. POST /api/v1/matches/analyze 
   analyzeMatch: async (cvFile, jobText) => {
     const formData = new FormData();
-    formData.append('cv', cvFile); 
-    formData.append('jobText', jobText);
+    formData.append('cv_file', cvFile); 
+    formData.append('job_text', jobText);
 
-    const response = await api.post('/matches/analyze', formData, {
+    const token = localStorage.getItem('accessToken'); 
+
+    const response = await fetch(`${API_URL}/api/v1/matches/analyze`, {
+      method: 'POST',
       headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
     });
-    return response.data;
+
+    if (!response.ok) {
+      throw new Error(`HTTP hatası! Durum: ${response.status}`);
+    }
+
+    return await response.json();
   },
 
   // 2. GET /api/v1/matches/history 
   getMatchHistory: async () => {
-    const response = await api.get('/matches/history');
-    return response.data;
+    const response = await fetch(`${API_URL}/api/v1/matches/history`);
+    
+    if (!response.ok) throw new Error("Geçmiş verisi alınamadı");
+    return await response.json();
   },
 
   // 3. GET /api/v1/matches/{match_id} 
   getMatchDetail: async (matchId) => {
-    const response = await api.get(`/matches/${matchId}`);
-    return response.data;
+    const response = await fetch(`${API_URL}/api/v1/matches/${matchId}`);
+    
+    if (!response.ok) throw new Error("Detay verisi alınamadı");
+    return await response.json();
   }
 };
