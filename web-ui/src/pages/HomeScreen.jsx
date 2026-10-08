@@ -52,7 +52,7 @@ export default function HomeScreen({ onStartInterview }) {
     }
 
     setStatus('analyzing');
-    setProgress(null); // Sahte animasyonu kaldırdık, yüklenirken null kalacak
+    setProgress(null); 
     
     try {
       const res = await matchService.analyzeMatch(cvFile || 'mock.pdf', jobText);
