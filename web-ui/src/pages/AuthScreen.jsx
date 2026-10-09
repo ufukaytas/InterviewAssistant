@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { authService } from '../services/authService';
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'; // Sadece Provider ve GoogleLogin var
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 // Bütün Auth işlemlerini barındıran İç Bileşen
 function AuthForm({ onLogin }) {
@@ -13,18 +13,29 @@ function AuthForm({ onLogin }) {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Hoca kuralı: Alert yerine ekranda şık mesaj göstermek için state
+  const [feedback, setFeedback] = useState({ type: '', text: '' });
+
+  // Ekranlar arası geçişte eski hata/başarı mesajlarını temizlemek için yardımcı fonksiyon
+  const changeView = (newView) => {
+    setFeedback({ type: '', text: '' });
+    setView(newView);
+  };
+
   const handleLogin = async () => {
     setLoading(true);
+    setFeedback({ type: '', text: '' });
     try {
       const response = await authService.login(email, password);
       if (response.isSuccessfull) {
         onLogin();
       } else {
-        alert(response.message || "Giriş başarısız.");
+        setFeedback({ type: 'error', text: 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.' });
+        console.error("Backend Mesajı (Login):", response.message);
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.message || error.response?.data?.detail || "Bir hata oluştu.";
-      alert(errorMsg);
+      setFeedback({ type: 'error', text: 'Sisteme bağlanırken bir hata oluştu.' });
+      console.error("Sistem Hatası (Login):", error.response?.data || error);
     } finally {
       setLoading(false);
     }
@@ -32,15 +43,17 @@ function AuthForm({ onLogin }) {
 
   const handleRegister = async () => {
     setLoading(true);
+    setFeedback({ type: '', text: '' });
     try {
       const response = await authService.register({ name, email, password });
       if (response.isSuccessfull) {
-        alert(response.message || "Kayıt başarılı! Lütfen giriş yapın.");
-        setView('login');
+        setFeedback({ type: 'success', text: 'Kayıt başarılı! Lütfen giriş yapın.' });
+        console.log("Backend Mesajı (Register):", response.message);
+        changeView('login');
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.detail || error.response?.data?.message || "Kayıt işlemi başarısız.";
-      alert(errorMsg);
+      setFeedback({ type: 'error', text: 'Kayıt işlemi gerçekleştirilemedi. Bilgilerinizi kontrol edin.' });
+      console.error("Sistem Hatası (Register):", error.response?.data || error);
     } finally {
       setLoading(false);
     }
@@ -48,46 +61,72 @@ function AuthForm({ onLogin }) {
 
   const handleForgot = async () => {
     setLoading(true);
+    setFeedback({ type: '', text: '' });
     try {
       const response = await authService.forgotPassword(email);
       if (response.isSuccessfull) {
-        alert(response.message || "Şifre sıfırlama kodu gönderildi.");
-        setView('verify');
+        setFeedback({ type: 'success', text: 'Şifre sıfırlama kodu e-posta adresinize gönderildi.' });
+        console.log("Backend Mesajı (Forgot):", response.message);
+        changeView('verify');
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.message || error.response?.data?.detail || "Bir hata oluştu.";
-      alert(errorMsg);
+      setFeedback({ type: 'error', text: 'Şifre sıfırlama işlemi başlatılamadı.' });
+      console.error("Sistem Hatası (Forgot):", error.response?.data || error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleVerify = async () => {
-    setView('reset');
+    changeView('reset');
   };
 
   const handleResetPassword = async () => {
     setLoading(true);
+    setFeedback({ type: '', text: '' });
     try {
       const response = await authService.resetPassword(email, code, newPassword);
       if (response.isSuccessfull || response.success !== false) {
-        alert("Şifreniz başarıyla güncellendi! Yeni şifrenizle giriş yapabilirsiniz.");
-        setView('login');
+        setFeedback({ type: 'success', text: 'Şifreniz başarıyla güncellendi! Yeni şifrenizle giriş yapabilirsiniz.' });
+        changeView('login');
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.message || error.response?.data?.detail || "Şifre güncellenemedi.";
-      alert(errorMsg);
+      setFeedback({ type: 'error', text: 'Şifre güncellenemedi, lütfen tekrar deneyin.' });
+      console.error("Sistem Hatası :", error.response?.data || error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Feedback (hata veya başarı) mesajını ekranda gösteren şık kutu
+  const renderFeedback = () => {
+    if (!feedback.text) return null;
+    
+    const isError = feedback.type === 'error';
+    return (
+      <div style={{
+        padding: '10px',
+        marginBottom: '15px',
+        borderRadius: '5px',
+        textAlign: 'center',
+        fontSize: '14px',
+        backgroundColor: isError ? '#fee2e2' : '#dcfce3',
+        color: isError ? '#991b1b' : '#166534',
+        border: `1px solid ${isError ? '#f87171' : '#86efac'}`
+      }}>
+        {feedback.text}
+      </div>
+    );
   };
 
   return (
     <div className="view active auth-wrapper">
       {view === 'login' && (
         <div className="auth-card">
-          <h1 className="auth-main-title">Kariyer AI</h1>
+          <h1 className="auth-main-title">Interview Assistant</h1>
           <p className="auth-subtitle">Yapay zeka destekli analiz ve mülakat simülasyonu ile kariyerinize hazırlanın.</p>
+          
+          {renderFeedback()}
           
           <div className="input-group">
             <label>E-posta Adresi</label>
@@ -104,34 +143,35 @@ function AuthForm({ onLogin }) {
 
           <div className="auth-divider">veya</div>
 
-          {/* YENİ GOOGLE BUTONU BURADA */}
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
             <GoogleLogin
               onSuccess={async (credentialResponse) => {
                 setLoading(true);
+                setFeedback({ type: '', text: '' });
                 try {
-                  // credentialResponse.credential, backend'in beklediği asıl JWT Token'dır.
                   const response = await authService.googleLogin(credentialResponse.credential);
                   if (response.isSuccessfull || response.success !== false) {
                     onLogin();
                   } else {
-                    alert(response.message || "Google girişi başarısız.");
+                    setFeedback({ type: 'error', text: 'Google ile giriş yapılamadı.' });
+                    console.error("Backend Mesajı (Google):", response.message);
                   }
                 } catch (error) {
-                  alert("Google girişi sırasında bir hata oluştu.");
+                  setFeedback({ type: 'error', text: 'Google girişi sırasında bir hata oluştu.' });
+                  console.error("Sistem Hatası (Google):", error);
                 } finally {
                   setLoading(false);
                 }
               }}
               onError={() => {
-                alert('Google girişi iptal edildi veya başarısız oldu.');
+                setFeedback({ type: 'error', text: 'Google girişi iptal edildi veya başarısız oldu.' });
               }}
             />
           </div>
 
           <div className="auth-footer">
-            <span className="text-link" onClick={() => setView('forgot')}>Şifremi Unuttum</span>
-            <span>Hesabın yok mu? <span className="text-link" onClick={() => setView('register')}>Kayıt Ol</span></span>
+            <span className="text-link" onClick={() => changeView('forgot')}>Şifremi Unuttum</span>
+            <span>Hesabın yok mu? <span className="text-link" onClick={() => changeView('register')}>Kayıt Ol</span></span>
           </div>
         </div>
       )}
@@ -140,6 +180,8 @@ function AuthForm({ onLogin }) {
         <div className="auth-card">
           <h2>Hesap Oluştur</h2>
           <p className="subtitle">Mülakat hazırlıklarına hemen başlamak için bilgilerinizi girin.</p>
+          
+          {renderFeedback()}
           
           <div className="input-group">
             <label>Ad Soyad</label>
@@ -158,7 +200,7 @@ function AuthForm({ onLogin }) {
             {loading ? 'Kayıt Yapılıyor...' : 'Kayıt Ol ve Başla'}
           </button>
           <div className="auth-footer">
-            <div className="auth-footer-center">Zaten hesabın var mı? <span className="text-link" onClick={() => setView('login')}>Giriş Yap</span></div>
+            <div className="auth-footer-center">Zaten hesabın var mı? <span className="text-link" onClick={() => changeView('login')}>Giriş Yap</span></div>
           </div>
         </div>
       )}
@@ -167,6 +209,9 @@ function AuthForm({ onLogin }) {
         <div className="auth-card">
           <h2>Şifre Sıfırlama</h2>
           <p className="subtitle">Hesabınıza bağlı e-posta adresini girin, size bir doğrulama kodu gönderelim.</p>
+          
+          {renderFeedback()}
+          
           <div className="input-group">
             <label>E-posta Adresi</label>
             <input type="email" className="input-field" placeholder="ornek@posta.com" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -175,7 +220,7 @@ function AuthForm({ onLogin }) {
             {loading ? 'Gönderiliyor...' : 'Kodu Gönder'}
           </button>
           <div className="auth-footer">
-            <div className="auth-footer-center"><span className="text-link" onClick={() => setView('login')}>Giriş ekranına dön</span></div>
+            <div className="auth-footer-center"><span className="text-link" onClick={() => changeView('login')}>Giriş ekranına dön</span></div>
           </div>
         </div>
       )}
@@ -184,6 +229,9 @@ function AuthForm({ onLogin }) {
         <div className="auth-card">
           <h2>Kodu Doğrula</h2>
           <p className="subtitle">E-posta adresinize gönderdiğimiz doğrulama kodunu girin.</p>
+          
+          {renderFeedback()}
+          
           <div className="input-group">
             <label>Doğrulama Kodu</label>
             <input type="text" className="input-field" placeholder="000000" style={{ textAlign: 'center', letterSpacing: '4px', fontSize: '18px', fontWeight: 'bold' }} value={code} onChange={(e) => setCode(e.target.value)} />
@@ -192,7 +240,7 @@ function AuthForm({ onLogin }) {
             İleri
           </button>
           <div className="auth-footer">
-            <div className="auth-footer-center"><span className="text-link" onClick={() => setView('forgot')}>Kodu tekrar gönder</span></div>
+            <div className="auth-footer-center"><span className="text-link" onClick={() => changeView('forgot')}>Kodu tekrar gönder</span></div>
           </div>
         </div>
       )}
@@ -201,6 +249,9 @@ function AuthForm({ onLogin }) {
         <div className="auth-card">
           <h2>Yeni Şifre Belirle</h2>
           <p className="subtitle">Lütfen hesabınız için yeni bir şifre girin.</p>
+          
+          {renderFeedback()}
+          
           <div className="input-group">
             <label>Yeni Şifre</label>
             <input type="password" className="input-field" placeholder="Yeni şifreniz" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
@@ -216,7 +267,6 @@ function AuthForm({ onLogin }) {
 
 // Ana Component
 export default function AuthScreen({ onLogin }) {
-  // Docker veya .env içerisinden alınan ID
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   return (
