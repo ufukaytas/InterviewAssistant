@@ -1,5 +1,4 @@
 export default function ReportScreen({ reportData, onReturnHome }) {
-  // 1. Veri kontrolü: Hem ana veri hem de feedback alt kutusu var mı diye bakıyoruz
   if (!reportData || !reportData.feedback) {
     return (
       <div className="view active" style={{ alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
@@ -9,7 +8,6 @@ export default function ReportScreen({ reportData, onReturnHome }) {
     );
   }
 
-  // 2. Backend'den gelen verileri parçalayıp kolay değişkenlere atıyoruz
   const feedback = reportData.feedback;
   const questions = reportData.questions || [];
 
@@ -18,7 +16,6 @@ export default function ReportScreen({ reportData, onReturnHome }) {
   const answeredCount = questions.filter(q => q.status === 'answered').length;
   const skippedCount = questions.filter(q => q.status === 'skipped').length;
 
-  // Harcanan toplam süreyi saniye cinsinden toplayıp Dakika:Saniye formatına çeviriyoruz
   const totalSeconds = questions.reduce((acc, q) => acc + (q.elapsed_seconds || 0), 0);
   const timeSpent = `${Math.floor(totalSeconds / 60)} dk ${totalSeconds % 60} sn`;
 
@@ -38,7 +35,6 @@ export default function ReportScreen({ reportData, onReturnHome }) {
               ? "Harika bir iş çıkardınız! Soruların büyük bir kısmına tatmin edici ve doğru yanıtlar verdiniz." 
               : "Bazı konularda eksikleriniz olsa da genel olarak iyi bir performans sergilediniz."}
           </p>
-          {/* Yapay Zekanın özel özeti buraya eklendi */}
           <p style={{ marginTop: '12px', fontSize: '0.95rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
             "{feedback.summary}"
           </p>
