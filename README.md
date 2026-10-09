@@ -569,7 +569,19 @@ npm run lint
 | nerminkilicarslan | interview-service |
 
 ---
-
+## **Screens**
+LoginScreen
+<img width="1470" height="800" alt="LoginScreen" src="https://github.com/user-attachments/assets/a09fbb6a-2b83-4521-8263-762909197f28" />
+HomeScreen
+<img width="1469" height="800" alt="HomeScreen" src="https://github.com/user-attachments/assets/a0ca56f9-83e1-402a-b8a9-a611e5fb361c" />
+AnalyseScreen
+<img width="1466" height="799" alt="AnalyseScreen" src="https://github.com/user-attachments/assets/64ca7263-9948-4f2b-aade-b6a4f21f807b" />
+InterviewStartScreen
+<img width="1470" height="806" alt="InterviewStartScreen" src="https://github.com/user-attachments/assets/9bc63365-141e-4142-a2d0-10f3ca621ecf" />
+InterviewScreen
+<img width="1470" height="799" alt="InterviewScreen" src="https://github.com/user-attachments/assets/dd320df0-c00d-4c7a-8a20-000e1b7e3a8b" />
+ReportScreen
+<img width="1470" height="799" alt="ReportScreen" src="https://github.com/user-attachments/assets/a6a9e3fc-e819-47e5-9fa4-a4252afa9416" />
 ## License
 
 No license file has been added yet. Until one is, all rights are reserved by the project authors.
