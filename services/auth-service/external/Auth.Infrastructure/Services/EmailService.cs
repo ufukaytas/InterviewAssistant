@@ -39,7 +39,7 @@ namespace Auth.Infrastructure.Services
 
           <tr>
             <td style=""background-color:#4f46e5;padding:28px 32px;"">
-              <span style=""color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.3px;"">Kariyer Network</span>
+              <span style=""color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.3px;"">Interview Asistant</span>
             </td>
           </tr>
 
