@@ -427,12 +427,20 @@ class InterviewService:
         now = datetime.now(timezone.utc)
         started_at = attempt.question_started_at or now
 
+        elapsed = (now - started_at).total_seconds()
+        if attempt.time_limit_seconds and elapsed > attempt.time_limit_seconds:
+            attempt.status = QuestionAttemptStatus.EXPIRED  # veya doğrudan hataya düş
+            await self._interviews.update(interview)
+            raise ValidationAppError(
+                "Soru için ayrılan süre dolduğundan cevabınız kabul edilmedi."
+            )
+
         attempt.question_started_at = started_at
         attempt.answered_at = now
         attempt.answer_text = answer_text
         attempt.elapsed_seconds = max(
             0,
-            int((now - started_at).total_seconds()),
+            int(elapsed),
         )
         attempt.status = QuestionAttemptStatus.ANSWERED
 
