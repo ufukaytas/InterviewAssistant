@@ -15,6 +15,7 @@ export default function HomeScreen({ onStartInterview }) {
   
   const [pastInterviews, setPastInterviews] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [feedback, setFeedback] = useState({ type: '', text: '' });
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -38,21 +39,24 @@ export default function HomeScreen({ onStartInterview }) {
       setCvFile(file);
       setCvName(file.name);
       setCvStyle({ borderColor: 'var(--success)', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)' });
+      setFeedback({ type: '', text: '' });
     }
   };
 
   const handleAnalyze = async () => {
+    setFeedback({ type: '', text: '' });
+
     if (!cvFile && cvName === 'Dosya Seç veya Sürükle') {
-      alert("Lütfen önce bir CV dosyası yükleyin.");
+      setFeedback({ type: 'error', text: 'Lütfen analiz işlemi için önce bir CV dosyası yükleyin.' });
       return;
     }
     if (!jobText.trim()) {
-      alert("Lütfen bir ilan metni girin.");
+      setFeedback({ type: 'error', text: 'Lütfen analiz işlemi için hedef iş ilanını metin kutusuna yapıştırın.' });
       return;
     }
 
     setStatus('analyzing');
-    setProgress(null); // Sahte animasyonu kaldırdık, yüklenirken null kalacak
+    setProgress(null); 
     
     try {
       const res = await matchService.analyzeMatch(cvFile || 'mock.pdf', jobText);
@@ -65,9 +69,23 @@ export default function HomeScreen({ onStartInterview }) {
       setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
     } catch (error) {
       setStatus('idle');
-      console.error("İşte gizlenen hata:", error);
-      alert("Analiz sırasında bir hata oluştu.");
+      setFeedback({ type: 'error', text: 'Analiz işlemi sırasında bir hata oluştu. Lütfen bağlantınızı kontrol edip tekrar deneyin.' });
+      console.error("Analiz servisi hatası:", error);
     }
+  };
+
+  const renderFeedback = () => {
+    if (!feedback.text) return null;
+    const isError = feedback.type === 'error';
+    return (
+      <div style={{
+        padding: '12px', marginBottom: '24px', borderRadius: '5px', textAlign: 'center', fontSize: '14px',
+        backgroundColor: isError ? '#fee2e2' : '#dcfce3', color: isError ? '#991b1b' : '#166534',
+        border: `1px solid ${isError ? '#f87171' : '#86efac'}`, width: '100%'
+      }}>
+        {feedback.text}
+      </div>
+    );
   };
 
   return (
@@ -82,6 +100,8 @@ export default function HomeScreen({ onStartInterview }) {
           <div className="info-step"><div className="info-step-num">3</div><div className="info-step-content"><h4>İlana özel mülakatı yanıtla</h4><p>Gerçek sorularla pratik yap, istersen tekrar tekrar dene.</p></div></div>
         </div>
       </div>
+
+      {renderFeedback()}
 
       <div className="input-grid">
         <div className="square-card">
@@ -130,7 +150,6 @@ export default function HomeScreen({ onStartInterview }) {
         <div id="analysis-section" style={{ display: 'block', width: '100%', borderTop: '1px dashed var(--border)', paddingTop: '40px', marginTop: '10px' }}>
           <div className="anim-container" style={{ marginBottom: '40px' }}>
             
-            {/* ÇEMBER DÜZENLEMESİ: Yüklenirken gri çember ve "..." gösteriyor */}
             <div className="progress-circle" style={{ background: status === 'done' ? `conic-gradient(var(--primary) ${progress}%, var(--border) 0%)` : 'var(--border)' }}>
               <div className="progress-inner">
                 <span className="pct-num">{status === 'done' ? `${progress}%` : '...'}</span>
@@ -188,7 +207,6 @@ export default function HomeScreen({ onStartInterview }) {
         </div>
       )}
 
-      {/* GEÇMİŞ MÜLAKATLAR ALANI (Şema hataları giderildi) */}
       <div className="history-section" id="past-interviews" style={{ display: 'block', width: '100%', marginTop: '40px' }}>
         <div className="history-header">Önceki Mülakat Kayıtları</div>
         <div className="history-list">
